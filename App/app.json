@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "LedgerOne",
+    "slug": "ledgerone",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "ledgerone",
+    "newArchEnabled": false,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.ledgerone.app"
+    },
+    "android": {
+      "package": "com.ledgerone.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#1b4332",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-splash-screen",
+      "expo-local-authentication"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

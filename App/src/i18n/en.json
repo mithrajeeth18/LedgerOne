@@ -1,0 +1,85 @@
+{
+  "home": {
+    "greeting": "Good day",
+    "online": "Online",
+    "offline": "Offline",
+    "pendingSync": "{{count}} payment pending sync",
+    "pendingSync_plural": "{{count}} payments pending sync",
+    "totalGroups": "Total Groups",
+    "activeLoans": "Active Loans",
+    "todayCollection": "Today's Collections",
+    "overdue": "Overdue"
+  },
+  "auth": {
+    "login": "Log In",
+    "logout": "Log Out",
+    "email": "Email",
+    "pin": "PIN",
+    "forgotPin": "Forgot PIN?",
+    "biometric": "Biometric Login",
+    "usePin": "Use PIN instead",
+    "resetPin": "Reset PIN",
+    "contactAdmin": "Contact your administrator to reset your PIN."
+  },
+  "groups": {
+    "title": "Groups",
+    "addGroup": "Add Group",
+    "noGroups": "No groups yet. Tap + to add one."
+  },
+  "customers": {
+    "title": "Customers",
+    "addCustomer": "Add Customer",
+    "searchPlaceholder": "Search by name or phone…",
+    "noCustomers": "No customers found."
+  },
+  "loans": {
+    "title": "Loans",
+    "loanNumber": "Loan #{{number}}",
+    "addLoan": "Add Loan",
+    "principal": "Principal",
+    "interest": "Interest Rate",
+    "startDate": "Start Date",
+    "termDays": "Term (Days)",
+    "installment": "Installment",
+    "status": {
+      "active": "Active",
+      "closed": "Closed",
+      "overdue": "Overdue"
+    }
+  },
+  "payments": {
+    "title": "Payments",
+    "addPayment": "Add Payment",
+    "amount": "Amount",
+    "date": "Payment Date",
+    "method": "Payment Method",
+    "cash": "Cash",
+    "upi": "UPI",
+    "bank": "Bank Transfer",
+    "paid": "Paid",
+    "unpaid": "Unpaid",
+    "locked": "Locked"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "useTamil": "Use Tamil",
+    "syncStatus": "Status",
+    "pending": "Pending",
+    "lastSync": "Last sync",
+    "syncNow": "Sync Now",
+    "syncing": "Syncing…"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "loading": "Loading…",
+    "error": "Something went wrong.",
+    "retry": "Retry",
+    "back": "Back",
+    "confirm": "Confirm"
+  }
+}
