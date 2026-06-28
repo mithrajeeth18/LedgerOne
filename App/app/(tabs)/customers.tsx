@@ -44,7 +44,11 @@ export default function CustomersScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Customers</Text>
-        <TouchableOpacity style={styles.addBtn} accessibilityLabel="Add Customer">
+        <TouchableOpacity
+          style={styles.addBtn}
+          onPress={() => router.push('/customer/create')}
+          accessibilityLabel="Add Customer"
+        >
           <Ionicons name="add" size={24} color={colors.textInverse} />
         </TouchableOpacity>
       </View>

@@ -1,43 +1,67 @@
 const colors = {
-  // Primary — forest green
-  primary:        '#1b4332',   // headers, active tab, primary buttons
-  primaryLight:   '#2d6a4f',   // hover states, secondary elements
-  primaryPale:    '#d8f3dc',   // light green backgrounds, success badges
-  primaryMuted:   '#639922',   // icons, accent text
+  // Field Resilience Colors (Sunlight-Safe)
+  background: '#f8faf3',
+  onBackground: '#191c18',
+  
+  primary: '#002e0b',          // Deep forest green
+  onPrimary: '#ffffff',
+  primaryContainer: '#0b4619',
+  onPrimaryContainer: '#7ab47b',
+  
+  secondary: '#5d5f5f',
+  onSecondary: '#ffffff',
+  
+  surface: '#f8faf3',
+  surfaceDim: '#d8dbd4',
+  surfaceBright: '#f8faf3',
+  surfaceContainerLowest: '#ffffff',
+  surfaceContainerLow: '#f2f4ed',
+  surfaceContainer: '#ecefe7',
+  surfaceContainerHigh: '#e7e9e2',
+  surfaceContainerHighest: '#e1e3dc',
+  onSurface: '#191c18',
+  onSurfaceVariant: '#41493f',
+  
+  statusPaid: '#15803d',       // Forest Green
+  statusPending: '#dc2626',    // High-intensity Red
+  statusUnderpaid: '#b45309',  // Amber – "paid something, but not enough"
+  statusInactive: '#94a3b8',
+  
+  borderHeavy: '#000000',
+  outline: '#71796f',
+  outlineVariant: '#c1c9bc',
+  
+  textPrimary: '#000000',      // Pure Black for sunlight safety
+  textSecondary: '#475569',    // Mid-tone slate gray
+  textMuted: '#6b7280',
+  textInverse: '#ffffff',
 
-  // Status colours
-  success:        '#1b4332',   // paid — green
-  successBg:      '#d8f3dc',   // paid background
-  danger:         '#c0392b',   // pending, overdue, logout button
-  dangerBg:       '#fdecea',   // pending background
-  warning:        '#e67e22',   // overdue badge
-  warningBg:      '#fef3e2',   // overdue background
-
-  // Neutrals
-  white:          '#ffffff',
-  background:     '#f8f6f1',   // off-white app background
-  surface:        '#ffffff',   // card backgrounds
-  border:         '#e0ddd6',   // card borders
-  borderStrong:   '#b5b2aa',   // focused input borders
-
-  // Text
-  textPrimary:    '#1a1a1a',   // main text
-  textSecondary:  '#6b6b6b',   // subtitles, labels
-  textMuted:      '#9e9e9e',   // placeholder, helper text
-  textInverse:    '#ffffff',   // text on dark backgrounds
-
-  // Day grid cells
-  gridPaid:       '#d8f3dc',   // green cell background
-  gridUnpaid:     '#fdecea',   // red cell background
-  gridSkipped:    '#f5f5f5',   // gray cell background
-  gridFuture:     '#fafafa',   // dashed future cell
-  gridLocked:     '#f0f0f0',   // locked past cell
-  gridToday:      '#ffffff',   // today cell — white with green border
+  // Day grid mapping
+  gridPaid: '#15803d',
+  gridUnpaid: '#dc2626',
+  gridSkipped: '#94a3b8',
+  gridFuture: '#e2e8f0',
+  gridLocked: '#cbd5e1',
+  gridToday: '#ffffff',
 
   // Tab bar
-  tabActive:      '#1b4332',   // active tab icon + label
-  tabInactive:    '#9e9e9e',   // inactive tab icon + label
-  tabBg:          '#ffffff',   // tab bar background
+  tabActive: '#002e0b',
+  tabInactive: '#6b7280',
+  tabBg: '#ffffff',
+
+  // ─── Backward Compatibility Fallbacks/Aliases ───────────────────────
+  white: '#ffffff',
+  border: '#e1e3dc',           // Mapped to surfaceContainerHighest
+  primaryPale: '#ecefe7',       // Mapped to surfaceContainer
+  primaryLight: '#0b4619',      // Mapped to primaryContainer
+  success: '#15803d',           // Mapped to statusPaid
+  successBg: '#ecefe7',         // Mapped to surfaceContainer
+  danger: '#dc2626',            // Mapped to statusPending
+  dangerBg: '#ffdad6',          // Mapped to error-container equivalent
+  warning: '#dc2626',
+  warningBg: '#ffdad6',
+  primaryMuted: '#71796f',
 };
 
 export default colors;
+export type ColorsType = typeof colors;

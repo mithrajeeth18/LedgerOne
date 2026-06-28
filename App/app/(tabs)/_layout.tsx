@@ -1,3 +1,5 @@
+import React from 'react';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -10,60 +12,105 @@ export default function TabsLayout() {
     return <Redirect href="/(auth)/login" />;
   }
 
+  const renderTabIcon = (
+    iconNameFocused: keyof typeof Ionicons.glyphMap,
+    iconNameUnfocused: keyof typeof Ionicons.glyphMap,
+    label: string,
+    focused: boolean
+  ) => {
+    if (focused) {
+      return (
+        <View style={styles.activeCapsule}>
+          <Ionicons name={iconNameFocused} size={22} color={colors.onPrimaryContainer} />
+          <Text style={styles.activeLabel}>{label}</Text>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.inactiveContainer}>
+        <Ionicons name={iconNameUnfocused} size={22} color={colors.tabInactive} />
+        <Text style={styles.inactiveLabel}>{label}</Text>
+      </View>
+    );
+  };
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.tabActive,
-        tabBarInactiveTintColor: colors.tabInactive,
+        tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: colors.tabBg,
-          borderTopColor: colors.border,
-          height: 60,
-          paddingBottom: 8,
+          backgroundColor: colors.background,
+          borderTopWidth: 2,
+          borderTopColor: colors.borderHeavy,
+          height: 72,
+          paddingBottom: Platform.OS === 'ios' ? 16 : 0,
         },
-        tabBarLabelStyle: {
-          fontSize: 12,
-          fontWeight: '600',
+        tabBarItemStyle: {
+          paddingTop: 8,
         },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused }) =>
+            renderTabIcon('home', 'home-outline', 'Home', focused),
         }}
       />
       <Tabs.Screen
         name="groups"
         options={{
-          title: 'Groups',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="people-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused }) =>
+            renderTabIcon('people', 'people-outline', 'Groups', focused),
         }}
       />
       <Tabs.Screen
         name="customers"
         options={{
-          title: 'Customers',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused }) =>
+            renderTabIcon('person', 'person-outline', 'Customers', focused),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="settings-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ focused }) =>
+            renderTabIcon('settings', 'settings-outline', 'Settings', focused),
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  activeCapsule: {
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 96,
+    height: 52,
+    gap: 2,
+  },
+  activeLabel: {
+    color: colors.onPrimaryContainer,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  inactiveContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 96,
+    height: 52,
+    gap: 2,
+  },
+  inactiveLabel: {
+    color: colors.tabInactive,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+});

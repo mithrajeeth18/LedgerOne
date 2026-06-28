@@ -4,6 +4,9 @@ export const customersApi = {
   getAll: (params?: { groupId?: string; search?: string; page?: number; limit?: number }) =>
     apiClient.get('/customers', { params }),
 
+  getByGroupId: (groupId: string) =>
+    apiClient.get(`/customers/group/${groupId}`),
+
   getById: (id: string) =>
     apiClient.get(`/customers/${id}`),
 

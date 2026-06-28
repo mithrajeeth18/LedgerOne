@@ -4,18 +4,21 @@ export const loansApi = {
   getAll: (params?: { groupId?: string; customerId?: string; status?: string; page?: number; limit?: number }) =>
     apiClient.get('/loans', { params }),
 
+  getByCustomerId: (customerId: string) =>
+    apiClient.get(`/loans/customer/${customerId}`),
+
   getById: (id: string) =>
     apiClient.get(`/loans/${id}`),
 
   create: (payload: {
     customerId: string;
     groupId: string;
-    principalAmount: number;
-    interestRate: number;
-    startDate: string;        // ISO date string
-    loanTermDays: number;
-    repaymentType: 'daily' | 'weekly' | 'monthly';
-    installmentAmount: number;
+    mode: 'daily' | 'principal';
+    dailyAmount?: number;
+    principalAmount?: number;
+    interestRate?: number;
+    totalDays: number;
+    startDate: string; // YYYY-MM-DD
   }) => apiClient.post('/loans', payload),
 
   update: (id: string, payload: Partial<{

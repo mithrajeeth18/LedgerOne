@@ -2,18 +2,25 @@ import apiClient from './client';
 
 export interface LoginPayload {
   email: string;
-  pin: string;
+  password: string;
+}
+
+export interface AuthUser {
+  _id: string;
+  name: string;
+  email: string;
+  role?: string;
+  groupId?: string;
+  biometricEnabled?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  __v?: number;
 }
 
 export interface LoginResponse {
-  token: string;
-  user: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-    groupId: string;
-  };
+  accessToken: string;
+  refreshToken: string;
+  user: AuthUser;
 }
 
 export const authApi = {

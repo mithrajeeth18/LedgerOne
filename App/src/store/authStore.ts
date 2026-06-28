@@ -1,17 +1,10 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { authApi, LoginPayload } from '../api/auth.api';
-
-interface User {
-  _id: string;
-  name: string;
-  email: string;
-  role: string;
-  groupId: string;
-}
+import { Platform } from 'react-native';
+import { AuthUser, authApi, LoginPayload } from '../api/auth.api';
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
@@ -26,6 +19,29 @@ interface AuthState {
 const TOKEN_KEY = 'authToken';
 const USER_KEY = 'authUser';
 
+const storage = {
+  getItem: async (key: string) => {
+    if (Platform.OS === 'web') {
+      return globalThis.localStorage?.getItem(key) ?? null;
+    }
+    return SecureStore.getItemAsync(key);
+  },
+  setItem: async (key: string, value: string) => {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.setItem(key, value);
+      return;
+    }
+    await SecureStore.setItemAsync(key, value);
+  },
+  deleteItem: async (key: string) => {
+    if (Platform.OS === 'web') {
+      globalThis.localStorage?.removeItem(key);
+      return;
+    }
+    await SecureStore.deleteItemAsync(key);
+  },
+};
+
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
@@ -37,28 +53,31 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const { data } = await authApi.login(payload);
-      await SecureStore.setItemAsync(TOKEN_KEY, data.token);
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(data.user));
-      set({ user: data.user, token: data.token, isAuthenticated: true, isLoading: false });
+      await storage.setItem(TOKEN_KEY, data.accessToken);
+      await storage.setItem(USER_KEY, JSON.stringify(data.user));
+      set({ user: data.user, token: data.accessToken, isAuthenticated: true, isLoading: false });
     } catch (err: any) {
       const message =
-        err?.response?.data?.message ?? 'Login failed. Please try again.';
+        err?.response?.data?.message ??
+        err?.response?.data?.error ??
+        err?.message ??
+        'Login failed. Please try again.';
       set({ error: message, isLoading: false });
     }
   },
 
   logout: async () => {
-    await SecureStore.deleteItemAsync(TOKEN_KEY).catch(() => {});
-    await SecureStore.deleteItemAsync(USER_KEY).catch(() => {});
+    await storage.deleteItem(TOKEN_KEY).catch(() => {});
+    await storage.deleteItem(USER_KEY).catch(() => {});
     set({ user: null, token: null, isAuthenticated: false });
   },
 
   loadStoredSession: async () => {
     try {
-      const token = await SecureStore.getItemAsync(TOKEN_KEY);
-      const raw = await SecureStore.getItemAsync(USER_KEY);
+      const token = await storage.getItem(TOKEN_KEY);
+      const raw = await storage.getItem(USER_KEY);
       if (token && raw) {
-        const user: User = JSON.parse(raw);
+        const user: AuthUser = JSON.parse(raw);
         set({ user, token, isAuthenticated: true });
       }
     } catch {

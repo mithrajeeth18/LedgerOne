@@ -1,5 +1,8 @@
 const Group = require('../models/Group');
 const Customer = require('../models/Customer');
+const Loan = require('../models/Loan');
+const Payment = require('../models/Payment');
+const mongoose = require('mongoose');
 const asyncHandler = require('../utils/asyncHandler');
 const { groupSchema } = require('../validators/group.validator');
 
@@ -78,4 +81,87 @@ const restoreGroup = asyncHandler(async (req, res) => {
   res.json(group);
 });
 
-module.exports = { getGroups, createGroup, updateGroup, deleteGroup, getBinGroups, restoreGroup };
+// ─── Dashboard: single aggregation — customers + active loan + today payment ───
+const getGroupDashboard = asyncHandler(async (req, res) => {
+  const groupId = new mongoose.Types.ObjectId(req.params.id);
+
+  // Validate group exists and belongs to this user's scope
+  const group = await Group.findOne({ _id: groupId, isDeleted: false }).lean();
+  if (!group) return res.status(404).json({ error: 'Group not found' });
+
+  // Today's date range in local server timezone (matching payment creation)
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+
+  const customers = await Customer.aggregate([
+    // Step 1: only customers in this group that are not deleted
+    { $match: { groupId, isDeleted: false } },
+
+    // Step 2: join their active loan (at most one per customer)
+    {
+      $lookup: {
+        from: 'loans',
+        let: { customerId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ['$customerId', '$$customerId'] },
+              status: 'active',
+            },
+          },
+          { $limit: 1 },
+          { $project: { _id: 1, loanNumber: 1, dailyAmount: 1 } },
+        ],
+        as: 'activeLoanArr',
+      },
+    },
+
+    // Step 3: unwind the loan array into a nullable field
+    {
+      $addFields: {
+        activeLoan: { $arrayElemAt: ['$activeLoanArr', 0] },
+      },
+    },
+
+    // Step 4: join today's payment for the active loan (if any)
+    {
+      $lookup: {
+        from: 'payments',
+        let: { loanId: '$activeLoan._id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$loanId', '$$loanId'] },
+                  { $gte: ['$paymentDate', todayStart] },
+                  { $lte: ['$paymentDate', todayEnd] },
+                ],
+              },
+            },
+          },
+          { $limit: 1 },
+          { $project: { _id: 1, status: 1, paidAmount: 1 } },
+        ],
+        as: 'todayPaymentArr',
+      },
+    },
+
+    // Step 5: shape final output
+    {
+      $project: {
+        _id: 1,
+        name: 1,
+        phone: 1,
+        activeLoan: { $ifNull: ['$activeLoan', null] },
+        todayPayment: { $ifNull: [{ $arrayElemAt: ['$todayPaymentArr', 0] }, null] },
+      },
+    },
+  ]);
+
+  res.json({ group: { _id: group._id, name: group.name }, customers });
+});
+
+module.exports = { getGroups, createGroup, updateGroup, deleteGroup, getBinGroups, restoreGroup, getGroupDashboard };

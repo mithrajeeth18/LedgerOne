@@ -19,7 +19,9 @@ const signAccessToken = (userId) =>
 const signRefreshToken = (userId) =>
   jwt.sign({ userId }, process.env.JWT_REFRESH_SECRET, { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN });
 
-const login = asyncHandler(async (req, res) => {
+const login = asyncHandler(async (req, res) =>
+{
+  console.log('Login request body:', req.body); // Debugging line
   const parsed = loginSchema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
 
@@ -33,6 +35,9 @@ const login = asyncHandler(async (req, res) => {
   const accessToken = signAccessToken(user._id);
   const refreshToken = signRefreshToken(user._id);
 
+  console.log('Access Token:', accessToken); // Debugging line
+  console.log('Refresh Token:', refreshToken);
+  console.log('User:', user);   // Debugging line
   res.json({ accessToken, refreshToken, user });
 });
 

@@ -8,7 +8,9 @@
     "@nozbe/watermelondb": "^0.28.0",
     "@react-native-community/netinfo": "^12.0.1",
     "axios": "^1.18.1",
+    "babel-preset-expo": "^56.0.15",
     "expo": "~56.0.12",
+    "expo-constants": "~56.0.18",
     "expo-local-authentication": "~56.0.4",
     "expo-notifications": "~56.0.18",
     "expo-router": "~56.2.11",
@@ -17,12 +19,14 @@
     "expo-status-bar": "~56.0.4",
     "i18next": "^26.3.3",
     "react": "19.2.3",
+    "react-dom": "19.2.3",
     "react-i18next": "^17.0.8",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
-    "react-native-reanimated": "^4.3.1",
+    "react-native-reanimated": "4.3.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "4.25.2",
+    "react-native-web": "^0.21.2",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
@@ -36,5 +40,6 @@
     "ios": "expo start --ios",
     "web": "expo start --web"
   },
-  "private": true
+  "private": true,
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

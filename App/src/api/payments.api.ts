@@ -6,10 +6,10 @@ export const paymentsApi = {
 
   create: (payload: {
     loanId: string;
-    amount: number;
+    paidAmount: number;
     paymentDate: string;       // ISO date string
-    paymentMethod?: 'cash' | 'upi' | 'bank';
-    notes?: string;
+    paymentMode: 'cash' | 'online';
+    isOfflineEntry?: boolean;
   }) => apiClient.post('/payments', payload),
 
   update: (id: string, payload: Partial<{
@@ -20,6 +20,9 @@ export const paymentsApi = {
 
   delete: (id: string) =>
     apiClient.delete(`/payments/${id}`),
+
+  getTodayPayments: () =>
+    apiClient.get('/payments/today'),
 
   bulkSync: (payments: Array<{
     localId: string;
