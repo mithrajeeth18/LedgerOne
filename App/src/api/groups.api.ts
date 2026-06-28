@@ -4,7 +4,7 @@ export type DashboardCustomer = {
   _id: string;
   name: string;
   phone: string;
-  activeLoan: { _id: string; loanNumber: number; dailyAmount: number } | null;
+  activeLoan: { _id: string; loanNumber: number; dailyAmount: number; startDate: string } | null;
   todayPayment: { _id: string; status: 'paid' | 'underpaid' | 'skipped' | 'overpaid'; paidAmount: number } | null;
 };
 

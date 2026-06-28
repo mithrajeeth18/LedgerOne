@@ -20,7 +20,7 @@ import colors from '../../src/theme/colors';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-type PaymentStatus = 'PAID' | 'UNDERPAID' | 'PENDING' | 'NO_LOAN';
+type PaymentStatus = 'PAID' | 'UNDERPAID' | 'PENDING' | 'NOT_STARTED' | 'NO_LOAN';
 type LoanFilter    = 'all' | 'active' | 'no_loan';
 type PaymentFilter = 'all' | 'pending' | 'paid' | 'underpaid';
 
@@ -37,6 +37,13 @@ interface CustomerCard {
 function resolveStatus(customer: DashboardCustomer): PaymentStatus {
   if (!customer.activeLoan) return 'NO_LOAN';
 
+  // Loan exists but hasn't started yet
+  const startDate = new Date(customer.activeLoan.startDate);
+  startDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  if (startDate > today) return 'NOT_STARTED';
+
   const payment = customer.todayPayment;
   if (!payment) return 'PENDING';
 
@@ -46,10 +53,11 @@ function resolveStatus(customer: DashboardCustomer): PaymentStatus {
 }
 
 const STATUS_ORDER: Record<PaymentStatus, number> = {
-  PENDING:   0,
-  UNDERPAID: 1,
-  NO_LOAN:   2,
-  PAID:      3,
+  PENDING:     0,
+  UNDERPAID:   1,
+  NOT_STARTED: 2,
+  NO_LOAN:     3,
+  PAID:        4,
 };
 
 function sortCustomers(cards: CustomerCard[]): CustomerCard[] {
@@ -59,10 +67,11 @@ function sortCustomers(cards: CustomerCard[]): CustomerCard[] {
 // ─── Status Chip config ───────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<PaymentStatus, { color: string; label: string }> = {
-  PAID:      { color: colors.statusPaid,      label: 'PAID'      },
-  UNDERPAID: { color: colors.statusUnderpaid, label: 'UNDERPAID' },
-  PENDING:   { color: colors.statusPending,   label: 'PENDING'   },
-  NO_LOAN:   { color: colors.statusInactive,  label: 'NO LOAN'   },
+  PAID:        { color: colors.statusPaid,        label: 'PAID'        },
+  UNDERPAID:   { color: colors.statusUnderpaid,   label: 'UNDERPAID'   },
+  PENDING:     { color: colors.statusPending,     label: 'PENDING'     },
+  NOT_STARTED: { color: '#2563eb',               label: 'NOT STARTED' },
+  NO_LOAN:     { color: colors.statusInactive,   label: 'NO LOAN'     },
 };
 
 // ─── Main Screen ─────────────────────────────────────────────────────────────
@@ -82,13 +91,13 @@ export default function GroupDetailScreen() {
 
   // ─── Filter state ─────────────────────────────────────────────────────────
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const [loanFilter,    setLoanFilter]    = useState<LoanFilter>('all');
+  const [loanFilter,    setLoanFilter]    = useState<LoanFilter>('active');
   const [paymentFilter, setPaymentFilter] = useState<PaymentFilter>('all');
   // Draft (in-sheet) copies so changes apply only on "APPLY FILTERS"
-  const [draftLoan,    setDraftLoan]    = useState<LoanFilter>('all');
+  const [draftLoan,    setDraftLoan]    = useState<LoanFilter>('active');
   const [draftPayment, setDraftPayment] = useState<PaymentFilter>('all');
 
-  const filtersActive = loanFilter !== 'all' || paymentFilter !== 'all';
+  const filtersActive = loanFilter !== 'active' || paymentFilter !== 'all';
 
   // ─── Fetch ───────────────────────────────────────────────────────────────
 
@@ -144,23 +153,24 @@ export default function GroupDetailScreen() {
   };
 
   const clearFilters = () => {
-    setDraftLoan('all');
+    setDraftLoan('active');
     setDraftPayment('all');
   };
 
   // ─── Counts for filter labels ─────────────────────────────────────────────
 
-  const activeCards  = allCards.filter(c => c.status !== 'NO_LOAN');
-  const noLoanCards  = allCards.filter(c => c.status === 'NO_LOAN');
-  const paidCount    = allCards.filter(c => c.status === 'PAID').length;
-  const pendingCount = allCards.filter(c => c.status === 'PENDING').length;
+  // Active = has a loan AND it has started (i.e. collecting is meaningful today)
+  const activeCards    = allCards.filter(c => c.status !== 'NO_LOAN' && c.status !== 'NOT_STARTED');
+  const noLoanCards    = allCards.filter(c => c.status === 'NO_LOAN');
+  const paidCount      = allCards.filter(c => c.status === 'PAID').length;
+  const pendingCount   = allCards.filter(c => c.status === 'PENDING').length;
   const underpaidCount = allCards.filter(c => c.status === 'UNDERPAID').length;
 
   // ─── Apply committed filters + search ────────────────────────────────────
 
   const filtered = allCards.filter(card => {
-    // Loan status filter
-    if (loanFilter === 'active'  && card.status === 'NO_LOAN') return false;
+    // Loan status filter — 'active' hides both NO_LOAN and NOT_STARTED
+    if (loanFilter === 'active'  && (card.status === 'NO_LOAN' || card.status === 'NOT_STARTED')) return false;
     if (loanFilter === 'no_loan' && card.status !== 'NO_LOAN') return false;
 
     // Payment focus (only meaningful when active loan)

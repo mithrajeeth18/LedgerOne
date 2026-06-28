@@ -20,6 +20,7 @@ interface GroupData {
   _id: string;
   name: string;
   customerCount: number;
+  activeLoanCount: number;
   paidCount: number;
 }
 
@@ -45,6 +46,11 @@ export default function GroupsScreen() {
           return cid === g._id;
         });
 
+        // Filter active loan customers in this group
+        const activeLoanCustomers = groupCustomers.filter(
+          (c: any) => c.activeLoan !== null && c.activeLoan !== undefined
+        );
+
         // Count payments collected today for this group
         const groupPayments = todayPayments.filter((p: any) => {
           const pgid = typeof p.loanId?.groupId === 'string' 
@@ -57,6 +63,7 @@ export default function GroupsScreen() {
           _id: g._id,
           name: g.name,
           customerCount: groupCustomers.length,
+          activeLoanCount: activeLoanCustomers.length,
           paidCount: groupPayments.length,
         };
       });
@@ -82,7 +89,7 @@ export default function GroupsScreen() {
   };
 
   const renderGroupItem = ({ item }: { item: GroupData }) => {
-    const isCompleted = item.paidCount === item.customerCount && item.customerCount > 0;
+    const isCompleted = item.paidCount === item.activeLoanCount && item.activeLoanCount > 0;
 
     return (
       <TouchableOpacity
@@ -116,7 +123,7 @@ export default function GroupsScreen() {
                   isCompleted && { color: colors.statusPaid }
                 ]}
               >
-                {item.paidCount} / {item.customerCount}
+                {item.paidCount} / {item.activeLoanCount}
               </Text>
             </View>
           </View>

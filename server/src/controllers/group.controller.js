@@ -112,7 +112,7 @@ const getGroupDashboard = asyncHandler(async (req, res) => {
             },
           },
           { $limit: 1 },
-          { $project: { _id: 1, loanNumber: 1, dailyAmount: 1 } },
+          { $project: { _id: 1, loanNumber: 1, dailyAmount: 1, startDate: 1 } },
         ],
         as: 'activeLoanArr',
       },

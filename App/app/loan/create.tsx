@@ -17,6 +17,7 @@ import { loansApi } from '../../src/api/loans.api';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
 import { useDataStore } from '../../src/store/dataStore';
+import CalendarModal from '../../src/components/CalendarModal';
 
 export default function CreateLoanScreen() {
   const { customerId, customerName, groupId } = useLocalSearchParams<{
@@ -41,6 +42,7 @@ export default function CreateLoanScreen() {
   });
 
   const [creating, setCreating] = useState(false);
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
   // Parse numeric values safely
   const parsedDailyAmount = parseFloat(dailyAmount) || 0;
@@ -121,11 +123,6 @@ export default function CreateLoanScreen() {
     }
   };
 
-  // Convert YYYY-MM-DD input field display/picker helper
-  const handleDateChange = (text: string) => {
-    // Simple format check (could expand with proper visual masks later)
-    setStartDate(text);
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -186,8 +183,8 @@ export default function CreateLoanScreen() {
           ) : (
             /* Mode 2: Principal + Interest input grid */
             <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>PRINCIPAL AMOUNT (₹)</Text>
+              <View style={[styles.inputGroup, { flex: 2 }]}>
+                <Text style={styles.label}>PRINCIPAL(₹)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -198,7 +195,7 @@ export default function CreateLoanScreen() {
                 />
               </View>
               <View style={[styles.inputGroup, { flex: 1 }]}>
-                <Text style={styles.label}>INTEREST RATE (%)</Text>
+                <Text style={styles.label}>INTEREST (%)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -226,12 +223,16 @@ export default function CreateLoanScreen() {
             </View>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.label}>START DATE</Text>
-              <View style={styles.dateInputContainer}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => setIsDatePickerVisible(true)}
+                style={styles.dateInputContainer}
+              >
                 <TextInput
                   style={[styles.input, { paddingRight: 36 }]}
                   value={startDate}
-                  onChangeText={handleDateChange}
-                  placeholder="YYYY-MM-DD"
+                  editable={false}
+                  placeholder="DD-MM-YYYY"
                   placeholderTextColor={colors.textMuted}
                 />
                 <Ionicons 
@@ -240,11 +241,19 @@ export default function CreateLoanScreen() {
                   color={colors.textPrimary} 
                   style={styles.calendarIcon} 
                 />
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
       </ScrollView>
+
+      {/* Calendar Picker Modal */}
+      <CalendarModal
+        visible={isDatePickerVisible}
+        onClose={() => setIsDatePickerVisible(false)}
+        selectedDate={startDate}
+        onSelectDate={setStartDate}
+      />
 
       {/* Bottom Summary Preview & Actions */}
       <View style={styles.bottomFixedContainer}>

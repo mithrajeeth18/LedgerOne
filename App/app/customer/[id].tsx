@@ -128,36 +128,52 @@ export default function CustomerDetailScreen() {
   let todayStatusColor = colors.statusPending;
   let pendingAmount = 0;
 
+  // Detect if the loan hasn't started yet (future start date)
+  let loanNotStarted = false;
+  let daysUntilStart = 0;
+  let startDateDisplay = '';
+
   if (activeLoan) {
     const start = new Date(activeLoan.startDate);
     start.setHours(0, 0, 0, 0);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const diffMs = today.getTime() - start.getTime();
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    dayNumber = Math.min(activeLoan.totalDays, Math.max(1, diffDays + 1));
+    const diffMs = start.getTime() - today.getTime();
+    daysUntilStart = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    loanNotStarted = daysUntilStart > 0;
 
-    // Check if any payment was made today
-    const todayStr = today.toISOString().split('T')[0];
-    const todayPayment = payments.find((p) => p.paymentDate.startsWith(todayStr));
-    hasPaymentToday = todayPayment !== undefined;
+    // Format startDate as DD-MM-YYYY for display
+    const dd = String(start.getDate()).padStart(2, '0');
+    const mm = String(start.getMonth() + 1).padStart(2, '0');
+    const yyyy = start.getFullYear();
+    startDateDisplay = `${dd}-${mm}-${yyyy}`;
 
-    if (todayPayment) {
-      todayStatusLabel = todayPayment.status.toUpperCase();
-      if (todayPayment.status === 'paid' || todayPayment.status === 'overpaid') {
-        todayStatusColor = colors.statusPaid;
-      } else if (todayPayment.status === 'underpaid') {
-        todayStatusColor = colors.statusUnderpaid; // amber — paid something but not full
-      } else {
-        todayStatusColor = colors.statusPending; // skipped = red
+    if (!loanNotStarted) {
+      const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      dayNumber = Math.min(activeLoan.totalDays, Math.max(1, diffDays + 1));
+
+      // Check if any payment was made today
+      const todayStr = today.toISOString().split('T')[0];
+      const todayPayment = payments.find((p) => p.paymentDate.startsWith(todayStr));
+      hasPaymentToday = todayPayment !== undefined;
+
+      if (todayPayment) {
+        todayStatusLabel = todayPayment.status.toUpperCase();
+        if (todayPayment.status === 'paid' || todayPayment.status === 'overpaid') {
+          todayStatusColor = colors.statusPaid;
+        } else if (todayPayment.status === 'underpaid') {
+          todayStatusColor = colors.statusUnderpaid;
+        } else {
+          todayStatusColor = colors.statusPending;
+        }
       }
-    }
 
-    // Calculate pending amount (Expected total up to today - Total paid)
-    const expectedUpToToday = activeLoan.dailyAmount * dayNumber;
-    const totalPaid = payments.reduce((sum, p) => sum + p.paidAmount, 0);
-    pendingAmount = Math.max(0, expectedUpToToday - totalPaid);
+      // Calculate pending amount
+      const expectedUpToToday = activeLoan.dailyAmount * dayNumber;
+      const totalPaid = payments.reduce((sum, p) => sum + p.paidAmount, 0);
+      pendingAmount = Math.max(0, expectedUpToToday - totalPaid);
+    }
   }
 
   return (
@@ -197,6 +213,35 @@ export default function CustomerDetailScreen() {
 
           {/* Loan Box */}
           {activeLoan ? (
+            loanNotStarted ? (
+              // ── Not Started Card (Follows design template) ─────────────────
+              <View style={styles.loanCard}>
+                <View style={styles.notStartedHeaderRow}>
+                  <View style={styles.notStartedHeaderLeft}>
+                    <View style={styles.notStartedBadge}>
+                      <Text style={styles.notStartedBadgeText}>NOT STARTED</Text>
+                    </View>
+                    <Text style={styles.notStartedTitle}>
+                      Starting in {daysUntilStart} {daysUntilStart === 1 ? 'day' : 'days'}
+                    </Text>
+                    <Text style={styles.notStartedSubtitle}>Starts on {startDateDisplay}</Text>
+                  </View>
+                  <Text style={styles.loanNumberLabel}>LOAN #{activeLoan.loanNumber}</Text>
+                </View>
+
+                <View style={styles.notStartedDivider} />
+
+                <View style={styles.notStartedTermsRow}>
+                  <Text style={styles.termsAmountText}>
+                    {formatCurrency(activeLoan.dailyAmount)}/day
+                  </Text>
+                  <Text style={styles.termsSeparatorText}> for </Text>
+                  <Text style={styles.termsDurationText}>
+                    {activeLoan.totalDays} days
+                  </Text>
+                </View>
+              </View>
+            ) : (
             <View style={styles.loanCard}>
               <View style={styles.loanCardHeader}>
                 <View style={[styles.statusBadge, { borderColor: todayStatusColor }]}>
@@ -224,6 +269,7 @@ export default function CustomerDetailScreen() {
                 </View>
               </View>
             </View>
+            )
           ) : (
             <View style={styles.noLoanCard}>
               <Ionicons name="alert-circle-outline" size={48} color={colors.textSecondary} />
@@ -245,8 +291,8 @@ export default function CustomerDetailScreen() {
             </View>
           )}
 
-          {/* Actions */}
-          {activeLoan && (
+          {/* Actions — hidden entirely when loan hasn't started */}
+          {activeLoan && !loanNotStarted && (
             <View style={styles.actionsContainer}>
               {/* Primary: Collect full amount instantly */}
               <TouchableOpacity
@@ -291,7 +337,7 @@ export default function CustomerDetailScreen() {
         </ScrollView>
 
         {/* Payment bottom sheet — rendered outside ScrollView so it overlays correctly */}
-        {activeLoan && (
+        {activeLoan && !loanNotStarted && (
           <PaymentModal
             bottomSheetRef={paymentSheetRef}
             loanId={activeLoan._id}
@@ -502,9 +548,72 @@ const styles = StyleSheet.create({
   loanCard: {
     backgroundColor: colors.surfaceContainerLowest,
     borderWidth: 2,
-    borderColor: colors.outlineVariant,
-    padding: 20,
-    gap: 16,
+    borderColor: colors.borderHeavy,
+    padding: 16,
+    gap: 12,
+    borderRadius: 4,
+  },
+  notStartedHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  notStartedHeaderLeft: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
+    flex: 1,
+  },
+  notStartedBadge: {
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 2,
+  },
+  notStartedBadgeText: {
+    color: '#2563eb',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  notStartedTitle: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: -0.5,
+    marginTop: 4,
+  },
+  notStartedSubtitle: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  notStartedDivider: {
+    height: 2,
+    backgroundColor: colors.borderHeavy,
+    marginVertical: 4,
+  },
+  notStartedTermsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  termsAmountText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.primaryLight || '#0b4619',
+  },
+  termsSeparatorText: {
+    fontSize: 16,
+    color: colors.textSecondary,
+    fontWeight: '500',
+  },
+  termsDurationText: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: colors.onSurface || '#191c18',
   },
   loanCardHeader: {
     flexDirection: 'row',

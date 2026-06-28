@@ -9,13 +9,40 @@ const thirtyDaysAgo = () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 const populateGroup = { path: 'groupId', select: 'name loanCounter' };
 
 const getCustomers = asyncHandler(async (req, res) => {
-  const customers = await Customer.find({ isDeleted: false }).populate(populateGroup).sort({ name: 1 });
-  res.json(customers);
+  const customers = await Customer.find({ isDeleted: false }).populate(populateGroup).sort({ name: 1 }).lean();
+  
+  // Find all active loans
+  const activeLoans = await Loan.find({ status: 'active' }).lean();
+  const loanMap = {};
+  for (const loan of activeLoans) {
+    loanMap[loan.customerId.toString()] = loan;
+  }
+
+  // Enrich each customer with their active loan
+  const enriched = customers.map(c => ({
+    ...c,
+    activeLoan: loanMap[c._id.toString()] || null
+  }));
+
+  res.json(enriched);
 });
 
 const getCustomersByGroup = asyncHandler(async (req, res) => {
-  const customers = await Customer.find({ groupId: req.params.groupId, isDeleted: false }).populate(populateGroup).sort({ name: 1 });
-  res.json(customers);
+  const customers = await Customer.find({ groupId: req.params.groupId, isDeleted: false }).populate(populateGroup).sort({ name: 1 }).lean();
+  
+  const customerIds = customers.map(c => c._id);
+  const activeLoans = await Loan.find({ customerId: { $in: customerIds }, status: 'active' }).lean();
+  const loanMap = {};
+  for (const loan of activeLoans) {
+    loanMap[loan.customerId.toString()] = loan;
+  }
+
+  const enriched = customers.map(c => ({
+    ...c,
+    activeLoan: loanMap[c._id.toString()] || null
+  }));
+
+  res.json(enriched);
 });
 
 const createCustomer = asyncHandler(async (req, res) => {
