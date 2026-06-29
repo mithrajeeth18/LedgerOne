@@ -56,6 +56,8 @@ export default function CreateCustomerScreen() {
   }, []);
 
   const handleCreate = async () => {
+    if (creating) return;
+
     if (!name.trim()) {
       Alert.alert('Validation Error', 'Please enter the customer\'s name.');
       return;
@@ -75,7 +77,7 @@ export default function CreateCustomerScreen() {
 
     setCreating(true);
     try {
-      await customersApi.create({
+      const { data } = await customersApi.create({
         name: name.trim(),
         phone: phoneClean,
         groupId: selectedGroupId,
@@ -83,15 +85,19 @@ export default function CreateCustomerScreen() {
 
       // Clear cached customer & group data in store to force a refresh on navigation back
       useDataStore.getState().invalidateCache();
+      
+      // Save info in global store to show the popup toast on the returning screen
+      useDataStore.getState().setLastCreatedCustomer({
+        id: data._id,
+        name: data.name,
+      });
 
-      Alert.alert('Success', 'Customer registered successfully!', [
-        { text: 'OK', onPress: () => router.back() }
-      ]);
+      // Navigate back immediately without blocking the collector with an alert popup
+      router.back();
     } catch (err: any) {
       const msg = err?.response?.data?.error ?? 'Failed to create customer.';
       Alert.alert('Registration Failed', msg);
-    } finally {
-      setCreating(false);
+      setCreating(false); // only reset on failure so they can correct inputs and try again
     }
   };
 

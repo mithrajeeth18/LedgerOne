@@ -7,6 +7,7 @@ import '../src/i18n';
 import { useAuthStore } from '../src/store/authStore';
 import { useSyncStore } from '../src/store/syncStore';
 import colors from '../src/theme/colors';
+import NewCustomerToast from '../src/components/NewCustomerToast';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,6 +36,7 @@ export default function RootLayout() {
         <Stack.Screen name="customer/[id]" />
         <Stack.Screen name="loan/[id]" />
       </Stack>
+      <NewCustomerToast />
     </GestureHandlerRootView>
   );
 }

@@ -18,19 +18,15 @@ export default function TabsLayout() {
     label: string,
     focused: boolean
   ) => {
-    if (focused) {
-      return (
-        <View style={styles.activeCapsule}>
-          <Ionicons name={iconNameFocused} size={22} color={colors.onPrimaryContainer} />
-          <Text style={styles.activeLabel}>{label}</Text>
-        </View>
-      );
-    }
+    const color = focused ? '#0b4619' : '#9ca3af'; // Forest green when active, muted gray when inactive
+    const icon = focused ? iconNameFocused : iconNameUnfocused;
 
     return (
-      <View style={styles.inactiveContainer}>
-        <Ionicons name={iconNameUnfocused} size={22} color={colors.tabInactive} />
-        <Text style={styles.inactiveLabel}>{label}</Text>
+      <View style={styles.tabItem}>
+        <Ionicons name={icon} size={22} color={color} />
+        <Text style={[styles.tabLabel, { color }]} numberOfLines={1}>
+          {label.toUpperCase()}
+        </Text>
       </View>
     );
   };
@@ -41,11 +37,11 @@ export default function TabsLayout() {
         headerShown: false,
         tabBarShowLabel: false,
         tabBarStyle: {
-          backgroundColor: colors.background,
-          borderTopWidth: 2,
-          borderTopColor: colors.borderHeavy,
-          height: 72,
-          paddingBottom: Platform.OS === 'ios' ? 16 : 0,
+          backgroundColor: '#ffffff', // White background
+          borderTopWidth: 1.5,
+          borderTopColor: '#e5e7eb', // Light gray top border
+          height: 64,
+          paddingBottom: Platform.OS === 'ios' ? 12 : 0,
         },
         tabBarItemStyle: {
           paddingTop: 8,
@@ -85,32 +81,16 @@ export default function TabsLayout() {
 }
 
 const styles = StyleSheet.create({
-  activeCapsule: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  tabItem: {
     alignItems: 'center',
     justifyContent: 'center',
-    width: 96,
-    height: 52,
-    gap: 2,
+    gap: 3,
   },
-  activeLabel: {
-    color: colors.onPrimaryContainer,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  inactiveContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 96,
-    height: 52,
-    gap: 2,
-  },
-  inactiveLabel: {
-    color: colors.tabInactive,
-    fontSize: 11,
-    fontWeight: '700',
+  tabLabel: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+    width: 80,
+    textAlign: 'center',
   },
 });

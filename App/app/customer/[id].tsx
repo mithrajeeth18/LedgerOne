@@ -50,6 +50,9 @@ export default function CustomerDetailScreen() {
   // Bottom sheet ref — used to open the payment modal
   const paymentSheetRef = useRef<BottomSheet>(null);
 
+  // Loan Management sheet visibility
+  const [isLoanMgmtVisible, setIsLoanMgmtVisible] = useState(false);
+
   const fetchCustomerDetails = async () => {
     try {
       // 1. Fetch customer and active loan info
@@ -58,9 +61,10 @@ export default function CustomerDetailScreen() {
       setActiveLoan(data.activeLoan);
 
       if (data.activeLoan) {
-        // 2. Fetch payments to check history and pending details
+        // 2. Fetch all payments for this loan (used for totalPaid + today status)
         const { data: rawPayments } = await paymentsApi.getForLoan(data.activeLoan._id);
         setPayments(rawPayments);
+        // Cache totalPaid so close/rollover screens don't re-query
       }
     } catch (err) {
       console.error('[CustomerDetail] Error fetching:', err);
@@ -127,6 +131,7 @@ export default function CustomerDetailScreen() {
   let todayStatusLabel = 'PENDING';
   let todayStatusColor = colors.statusPending;
   let pendingAmount = 0;
+  let totalPaid = 0; // sum of all payments on this loan — passed to close/rollover screens
 
   // Detect if the loan hasn't started yet (future start date)
   let loanNotStarted = false;
@@ -148,6 +153,9 @@ export default function CustomerDetailScreen() {
     const mm = String(start.getMonth() + 1).padStart(2, '0');
     const yyyy = start.getFullYear();
     startDateDisplay = `${dd}-${mm}-${yyyy}`;
+
+    // totalPaid across ALL payments for this loan (used for close/rollover)
+    totalPaid = payments.reduce((sum, p) => sum + p.paidAmount, 0);
 
     if (!loanNotStarted) {
       const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -171,7 +179,6 @@ export default function CustomerDetailScreen() {
 
       // Calculate pending amount
       const expectedUpToToday = activeLoan.dailyAmount * dayNumber;
-      const totalPaid = payments.reduce((sum, p) => sum + p.paidAmount, 0);
       pendingAmount = Math.max(0, expectedUpToToday - totalPaid);
     }
   }
@@ -243,6 +250,7 @@ export default function CustomerDetailScreen() {
               </View>
             ) : (
             <View style={styles.loanCard}>
+              {/* Row 1: status badge (left) | LOAN# (right) */}
               <View style={styles.loanCardHeader}>
                 <View style={[styles.statusBadge, { borderColor: todayStatusColor }]}>
                   <Text style={[styles.statusBadgeText, { color: todayStatusColor }]}>
@@ -252,7 +260,16 @@ export default function CustomerDetailScreen() {
                 <Text style={styles.loanNumberLabel}>LOAN #{activeLoan.loanNumber}</Text>
               </View>
 
-              <Text style={styles.dayCounter}>Day {dayNumber} of {activeLoan.totalDays}</Text>
+              {/* Row 2: Day counter (left) | 3-dot menu (right) */}
+              <View style={styles.dayCounterRow}>
+                <Text style={styles.dayCounter}>Day {dayNumber} of {activeLoan.totalDays}</Text>
+                <TouchableOpacity
+                  style={styles.threeDotBtn}
+                  onPress={() => setIsLoanMgmtVisible(true)}
+                >
+                  <Ionicons name="ellipsis-vertical" size={22} color={colors.textSecondary} />
+                </TouchableOpacity>
+              </View>
 
               <View style={styles.detailsTable}>
                 <View style={styles.tableRow}>
@@ -327,7 +344,13 @@ export default function CustomerDetailScreen() {
               {/* Tertiary: View full history */}
               <TouchableOpacity
                 style={styles.historyBtn}
-                onPress={() => Alert.alert('Loan History', 'Loan History popup')}
+                onPress={() => router.push({
+                  pathname: '/loan/history',
+                  params: {
+                    loanId: activeLoan!._id,
+                    customerName: customer.name,
+                  },
+                })}
               >
                 <Ionicons name="time-outline" size={20} color={colors.primary} />
                 <Text style={styles.historyBtnText}>VIEW LOAN HISTORY</Text>
@@ -347,6 +370,71 @@ export default function CustomerDetailScreen() {
             onPaymentSaved={fetchCustomerDetails}
           />
         )}
+
+        {/* ── Loan Management Bottom Sheet ── */}
+        <Modal
+          visible={isLoanMgmtVisible}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setIsLoanMgmtVisible(false)}
+        >
+          <TouchableOpacity
+            style={styles.loanMgmtOverlay}
+            activeOpacity={1}
+            onPress={() => setIsLoanMgmtVisible(false)}
+          >
+            <View style={styles.loanMgmtSheet}>
+              {/* Sheet Header */}
+              <View style={styles.loanMgmtHeader}>
+                <Text style={styles.loanMgmtTitle}>LOAN MANAGEMENT</Text>
+                <TouchableOpacity onPress={() => setIsLoanMgmtVisible(false)}>
+                  <Ionicons name="close" size={24} color={colors.textPrimary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Option 1: Close Loan */}
+              <TouchableOpacity
+                style={styles.loanMgmtOption}
+                onPress={() => {
+                  setIsLoanMgmtVisible(false);
+                  router.push({
+                    pathname: '/loan/close',
+                    params: {
+                      loanId: activeLoan!._id,
+                      customerName: customer.name,
+                      principalAmount: String(activeLoan!.principalAmount ?? activeLoan!.dailyAmount * activeLoan!.totalDays),
+                      totalPaid: String(totalPaid),
+                    },
+                  });
+                }}
+              >
+                <Ionicons name="trash-outline" size={22} color="#dc2626" />
+                <Text style={[styles.loanMgmtOptionText, { color: '#dc2626' }]}>CLOSE LOAN</Text>
+              </TouchableOpacity>
+
+              {/* Option 2: Close & Rollover */}
+              <TouchableOpacity
+                style={styles.loanMgmtOption}
+                onPress={() => {
+                  setIsLoanMgmtVisible(false);
+                  router.push({
+                    pathname: '/loan/rollover',
+                    params: {
+                      loanId: activeLoan!._id,
+                      customerName: customer.name,
+                      groupId: typeof customer.groupId === 'string' ? customer.groupId : customer.groupId?._id,
+                      principalAmount: String(activeLoan!.principalAmount ?? activeLoan!.dailyAmount * activeLoan!.totalDays),
+                      totalPaid: String(totalPaid),
+                    },
+                  });
+                }}
+              >
+                <Ionicons name="sync-outline" size={22} color="#b45309" />
+                <Text style={[styles.loanMgmtOptionText, { color: '#b45309' }]}>CLOSE & ROLLOVER</Text>
+              </TouchableOpacity>
+            </View>
+          </TouchableOpacity>
+        </Modal>
 
         {/* ── Instant Collection Payment Mode Modal Overlay ── */}
         <Modal
@@ -640,8 +728,17 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
     color: colors.primary,
-    textAlign: 'center',
-    marginVertical: 4,
+    textAlign: 'left',
+    flex: 1,
+  },
+  dayCounterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  threeDotBtn: {
+    padding: 6,
+    marginLeft: 4,
   },
   detailsTable: {
     borderTopWidth: 1.5,
@@ -848,6 +945,51 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 14,
     fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+
+  // ── Loan Management Bottom Sheet ──────────────────────────────────────────
+  loanMgmtOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'flex-end',
+  },
+  loanMgmtSheet: {
+    backgroundColor: colors.surfaceContainerLowest,
+    borderTopWidth: 2,
+    borderTopColor: colors.borderHeavy,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 36,
+    gap: 12,
+  },
+  loanMgmtHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  loanMgmtTitle: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: colors.textPrimary,
+    letterSpacing: 0.8,
+  },
+  loanMgmtOption: {
+    height: 56,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderWidth: 2,
+    borderColor: colors.borderHeavy,
+    backgroundColor: colors.surfaceContainerLowest,
+    borderRadius: 4,
+  },
+  loanMgmtOptionText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: colors.textPrimary,
     letterSpacing: 0.5,
   },
 });

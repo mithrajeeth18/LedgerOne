@@ -76,13 +76,17 @@ apiClient.interceptors.request.use(
   (error) => Promise.reject(error),
 );
 
-// ─── Response interceptor — handle 401 ─────────────────────────────────────
+// ─── Response interceptor — handle 401 / 403 ────────────────────────────────
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      // Token expired — clear stored credentials
-      await storage.deleteItem('authToken').catch(() => {});
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      try {
+        const { useAuthStore } = require('../store/authStore');
+        await useAuthStore.getState().logout();
+      } catch (err) {
+        console.error('[API Client] Silent logout failed:', err);
+      }
     }
     return Promise.reject(error);
   },

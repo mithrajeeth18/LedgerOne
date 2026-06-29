@@ -15,6 +15,7 @@ interface CalendarModalProps {
   onClose: () => void;
   selectedDate: string; // Format: DD-MM-YYYY
   onSelectDate: (date: string) => void;
+  minDate?: Date; // Optional: dates before this are disabled
 }
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -28,6 +29,7 @@ export default function CalendarModal({
   onClose,
   selectedDate,
   onSelectDate,
+  minDate,
 }: CalendarModalProps) {
   // Parse initial selectedDate (DD-MM-YYYY)
   const parsedSelected = useMemo(() => {
@@ -96,6 +98,14 @@ export default function CalendarModal({
   };
 
   const handleSelectDay = (day: number) => {
+    // Don't allow selection of disabled past dates
+    if (minDate) {
+      const candidate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+      candidate.setHours(0, 0, 0, 0);
+      const min = new Date(minDate);
+      min.setHours(0, 0, 0, 0);
+      if (candidate < min) return;
+    }
     const dd = String(day).padStart(2, '0');
     const mm = String(viewDate.getMonth() + 1).padStart(2, '0');
     const yyyy = viewDate.getFullYear();
@@ -146,14 +156,23 @@ export default function CalendarModal({
                 parsedSelected.getMonth() === viewDate.getMonth() &&
                 parsedSelected.getFullYear() === viewDate.getFullYear();
 
+              let isDisabled = false;
+              if (minDate && day !== null) {
+                const candidate = new Date(viewDate.getFullYear(), viewDate.getMonth(), day);
+                candidate.setHours(0, 0, 0, 0);
+                const min = new Date(minDate);
+                min.setHours(0, 0, 0, 0);
+                isDisabled = candidate < min;
+              }
+
               return (
                 <TouchableOpacity
                   key={`day-${day}`}
-                  style={[styles.dayBox, isSelected && styles.dayBoxSelected]}
+                  style={[styles.dayBox, isSelected && styles.dayBoxSelected, isDisabled && styles.dayBoxDisabled]}
                   onPress={() => handleSelectDay(day)}
-                  activeOpacity={0.8}
+                  activeOpacity={isDisabled ? 1 : 0.8}
                 >
-                  <Text style={[styles.dayText, isSelected && styles.dayTextSelected]}>
+                  <Text style={[styles.dayText, isSelected && styles.dayTextSelected, isDisabled && styles.dayTextDisabled]}>
                     {day}
                   </Text>
                 </TouchableOpacity>
@@ -253,6 +272,12 @@ const styles = StyleSheet.create({
   },
   dayTextSelected: {
     color: colors.white,
+  },
+  dayBoxDisabled: {
+    opacity: 0.3,
+  },
+  dayTextDisabled: {
+    color: colors.textMuted,
   },
   cancelBtn: {
     alignSelf: 'flex-end',

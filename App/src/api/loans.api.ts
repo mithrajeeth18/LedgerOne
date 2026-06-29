@@ -26,8 +26,17 @@ export const loansApi = {
     notes: string;
   }>) => apiClient.put(`/loans/${id}`, payload),
 
+  /** Close an active loan (marks status = 'closed') */
   close: (id: string) =>
-    apiClient.post(`/loans/${id}/close`),
+    apiClient.put(`/loans/${id}/close`, {}),
+
+  /** Close current loan and create a new loan carrying the remaining balance */
+  rollover: (id: string, payload: {
+    newAmount: number;
+    interestRate: number;
+    totalDays: number;
+    startDate: string; // ISO string
+  }) => apiClient.post(`/loans/${id}/rollover`, payload),
 
   getPaymentSchedule: (id: string) =>
     apiClient.get(`/loans/${id}/schedule`),

@@ -1,5 +1,8 @@
 const Payment = require('../models/Payment');
 const Loan = require('../models/Loan');
+const User = require('../models/User');
+const Group = require('../models/Group');
+const Customer = require('../models/Customer');
 const asyncHandler = require('../utils/asyncHandler');
 const { getPaymentStatus, isPaymentLocked } = require('../utils/loanCalculator');
 const { paymentSchema, updatePaymentSchema, syncPaymentSchema } = require('../validators/payment.validator');
@@ -88,6 +91,37 @@ const updatePayment = asyncHandler(async (req, res) => {
 
 const getTodayPayments = asyncHandler(async (req, res) => {
   const today = new Date();
+
+  // 1. Fetch active groups
+  const activeGroups = await Group.find({ isDeleted: false }).lean();
+  const byGroup = {};
+  for (const g of activeGroups) {
+    byGroup[g.name] = {
+      groupId: g._id.toString(),
+      groupName: g.name,
+      collected: 0,
+      expected: 0,
+      totalCash: 0,
+      totalOnline: 0,
+      totalActiveCustomers: 0,
+      paidCustomersCount: 0,
+    };
+  }
+
+  // 2. Fetch active loans to count total active customers & compute total expected collections today
+  const activeLoans = await Loan.find({ status: 'active' }).populate('customerId').lean();
+  for (const loan of activeLoans) {
+    if (!loan.customerId || loan.customerId.isDeleted) continue;
+    if (loan.startDate > endOfDay(today)) continue;
+
+    const group = activeGroups.find(g => g._id.toString() === loan.groupId.toString());
+    if (group && byGroup[group.name]) {
+      byGroup[group.name].totalActiveCustomers += 1;
+      byGroup[group.name].expected += loan.dailyAmount;
+    }
+  }
+
+  // 3. Fetch today's payments
   const payments = await Payment.find({
     paymentDate: { $gte: startOfDay(today), $lte: endOfDay(today) },
   })
@@ -95,35 +129,51 @@ const getTodayPayments = asyncHandler(async (req, res) => {
     .populate({
       path: 'loanId',
       populate: [
-        { path: 'customerId', select: 'name' },
+        { path: 'customerId', select: 'name isDeleted' },
         { path: 'groupId', select: 'name' },
       ],
     });
 
+  // 4. Initialize collectors with all registered users in database
+  const allUsers = await User.find().lean();
   const byCollector = {};
-  const byGroup = {};
+  for (const u of allUsers) {
+    byCollector[u.name] = {
+      count: 0,
+      totalCash: 0,
+      totalOnline: 0,
+      totalAmount: 0,
+    };
+  }
+
   const totals = { totalCollected: 0, totalCash: 0, totalOnline: 0 };
 
+  // 5. Aggregate payments into totals, groups, and collectors
   for (const payment of payments) {
+    if (!payment.loanId || !payment.loanId.customerId || payment.loanId.customerId.isDeleted) continue;
+
     const collectorName = payment.collectedBy?.name || 'Unknown';
     const groupName = payment.loanId?.groupId?.name || 'Unknown';
 
-    if (!byCollector[collectorName]) byCollector[collectorName] = { count: 0, totalCash: 0, totalOnline: 0, totalAmount: 0 };
+    if (!byCollector[collectorName]) {
+      byCollector[collectorName] = { count: 0, totalCash: 0, totalOnline: 0, totalAmount: 0 };
+    }
     byCollector[collectorName].count += 1;
     byCollector[collectorName].totalAmount += payment.paidAmount;
 
-    if (!byGroup[groupName]) byGroup[groupName] = { collected: 0, expected: 0, totalCash: 0, totalOnline: 0 };
-    byGroup[groupName].collected += payment.paidAmount;
-    byGroup[groupName].expected += payment.expectedAmount;
+    if (byGroup[groupName]) {
+      byGroup[groupName].collected += payment.paidAmount;
+      byGroup[groupName].paidCustomersCount += 1;
+    }
 
     totals.totalCollected += payment.paidAmount;
     if (payment.paymentMode === 'cash') {
       byCollector[collectorName].totalCash += payment.paidAmount;
-      byGroup[groupName].totalCash += payment.paidAmount;
+      if (byGroup[groupName]) byGroup[groupName].totalCash += payment.paidAmount;
       totals.totalCash += payment.paidAmount;
     } else {
       byCollector[collectorName].totalOnline += payment.paidAmount;
-      byGroup[groupName].totalOnline += payment.paidAmount;
+      if (byGroup[groupName]) byGroup[groupName].totalOnline += payment.paidAmount;
       totals.totalOnline += payment.paidAmount;
     }
   }

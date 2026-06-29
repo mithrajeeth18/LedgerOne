@@ -16,6 +16,8 @@ interface DataState {
   fetchCustomers: (force?: boolean) => Promise<any[]>;
   fetchTodayPayments: (force?: boolean) => Promise<any[]>;
   invalidateCache: () => void;
+  lastCreatedCustomer: { id: string; name: string } | null;
+  setLastCreatedCustomer: (customer: { id: string; name: string } | null) => void;
 }
 
 export const useDataStore = create<DataState>((set, get) => ({
@@ -90,4 +92,6 @@ export const useDataStore = create<DataState>((set, get) => ({
       paymentsLoaded: false,
     });
   },
+  lastCreatedCustomer: null,
+  setLastCreatedCustomer: (customer) => set({ lastCreatedCustomer: customer }),
 }));

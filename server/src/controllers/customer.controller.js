@@ -52,6 +52,15 @@ const createCustomer = asyncHandler(async (req, res) => {
   const group = await Group.findOne({ _id: parsed.data.groupId, isDeleted: false });
   if (!group) return res.status(400).json({ error: 'Group not found' });
 
+  // Prevent duplicate phone numbers for active customers
+  const existingCustomer = await Customer.findOne({
+    phone: parsed.data.phone,
+    isDeleted: false,
+  });
+  if (existingCustomer) {
+    return res.status(400).json({ error: 'A customer with this phone number is already registered.' });
+  }
+
   const customer = await Customer.create(parsed.data);
   const populated = await customer.populate(populateGroup);
   res.status(201).json(populated);
