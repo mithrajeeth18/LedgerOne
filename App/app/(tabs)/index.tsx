@@ -266,11 +266,12 @@ export default function HomeScreen() {
           ) : (
             groupEntries.map((group, idx) => {
               const isCompleted =
-                group.expected > 0 && group.collected >= group.expected;
+                group.totalActiveCustomers > 0 &&
+                group.paidCustomersCount >= group.totalActiveCustomers;
               
-              // Calculate percentage safely
-              const percent = group.expected > 0 
-                ? Math.min(100, Math.round((group.collected / group.expected) * 100)) 
+              // Calculate percentage safely based on customer counts rather than amount
+              const percent = group.totalActiveCustomers > 0 
+                ? Math.min(100, Math.round((group.paidCustomersCount / group.totalActiveCustomers) * 100)) 
                 : 0;
 
               return (
@@ -278,7 +279,10 @@ export default function HomeScreen() {
                   {idx > 0 && <View style={styles.cardDividerHorizontal} />}
                   <TouchableOpacity
                     style={styles.groupRow}
-                    onPress={() => router.push(`/group/${group.groupId}`)}
+                    onPress={() => router.push({
+                      pathname: '/group/[id]',
+                      params: { id: group.groupId, fromHome: 'true' }
+                    })}
                     activeOpacity={0.85}
                   >
                     {/* Line 1: Group Name & Today Collected Amount */}

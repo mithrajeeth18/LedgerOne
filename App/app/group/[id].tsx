@@ -17,6 +17,7 @@ import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupsApi, DashboardCustomer } from '../../src/api/groups.api';
 import colors from '../../src/theme/colors';
+import { formatCurrency } from '../../src/utils/formatCurrency';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,8 @@ interface CustomerCard {
   phone: string;
   status: PaymentStatus;
   loanNumber?: number;
+  paidAmount?: number;
+  pendingAmount?: number;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -77,9 +80,10 @@ const STATUS_CONFIG: Record<PaymentStatus, { color: string; label: string }> = {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function GroupDetailScreen() {
-  const { id, groupName: paramName } = useLocalSearchParams<{
+  const { id, groupName: paramName, fromHome } = useLocalSearchParams<{
     id: string;
     groupName?: string;
+    fromHome?: string;
   }>();
 
   const [groupName, setGroupName]   = useState(paramName ?? '…');
@@ -108,13 +112,29 @@ export default function GroupDetailScreen() {
 
       setGroupName(data.group.name);
 
-      const cards: CustomerCard[] = data.customers.map((c) => ({
-        _id: c._id,
-        name: c.name,
-        phone: c.phone,
-        status: resolveStatus(c),
-        loanNumber: c.activeLoan?.loanNumber || undefined,
-      }));
+      const cards: CustomerCard[] = data.customers.map((c) => {
+        const status = resolveStatus(c);
+        let paidAmount = 0;
+        let pendingAmount = 0;
+
+        if (c.activeLoan) {
+          pendingAmount = c.activeLoan.dailyAmount;
+          if (c.todayPayment) {
+            paidAmount = c.todayPayment.paidAmount;
+            pendingAmount = Math.max(0, c.activeLoan.dailyAmount - c.todayPayment.paidAmount);
+          }
+        }
+
+        return {
+          _id: c._id,
+          name: c.name,
+          phone: c.phone,
+          status,
+          loanNumber: c.activeLoan?.loanNumber || undefined,
+          paidAmount,
+          pendingAmount,
+        };
+      });
 
       setAllCards(sortCustomers(cards));
     } catch (err) {
@@ -214,10 +234,51 @@ export default function GroupDetailScreen() {
           <Text style={styles.customerPhone}>{item.phone}</Text>
         </View>
 
-        {/* Right: dot + label */}
-        <View style={styles.cardRight}>
-          <View style={[styles.dot, { backgroundColor: color }]} />
-          <Text style={[styles.statusLabel, { color }]}>{label}</Text>
+        {/* Right side: status display depending on navigation context */}
+        <View style={[styles.cardRight, fromHome !== 'true' && { alignItems: 'center', minWidth: 64 }]}>
+          {fromHome === 'true' ? (
+            (() => {
+              const status = item.status;
+              if (status === 'PAID') {
+                return (
+                  <Text style={[styles.statusLabelBold, { color: colors.statusPaid }]}>
+                    PAID {formatCurrency(item.paidAmount ?? 0)}
+                  </Text>
+                );
+              }
+              if (status === 'UNDERPAID') {
+                return (
+                  <Text style={[styles.statusLabelBold, { color: colors.statusUnderpaid }]}>
+                    PAID {formatCurrency(item.paidAmount ?? 0)}
+                  </Text>
+                );
+              }
+              if (status === 'PENDING') {
+                return (
+                  <Text style={[styles.statusLabelBold, { color: colors.statusPending }]}>
+                    PENDING {formatCurrency(item.pendingAmount ?? 0)}
+                  </Text>
+                );
+              }
+              if (status === 'NOT_STARTED') {
+                return (
+                  <Text style={[styles.statusLabelBold, { color: '#2563eb' }]}>
+                    NOT STARTED
+                  </Text>
+                );
+              }
+              return (
+                <Text style={[styles.statusLabelBold, { color: colors.statusInactive }]}>
+                  NO LOAN
+                </Text>
+              );
+            })()
+          ) : (
+            <>
+              <View style={[styles.dot, { backgroundColor: color }]} />
+              <Text style={[styles.statusLabel, { color }]}>{label}</Text>
+            </>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -559,14 +620,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cardRight: {
-    alignItems: 'center',
-    gap: 5,
-    minWidth: 64,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  statusLabelBold: {
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
   dot: {
     width: 22,
     height: 22,
     borderRadius: 11,
+    marginBottom: 4,
   },
   statusLabel: {
     fontSize: 10,
