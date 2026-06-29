@@ -68,7 +68,7 @@ export default function CustomerDetailScreen() {
       }
     } catch (err) {
       console.error('[CustomerDetail] Error fetching:', err);
-      Alert.alert('Error', 'Failed to load customer details.');
+      Alert.alert(t('common.error'), t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -99,11 +99,11 @@ export default function CustomerDetailScreen() {
 
       setIsCollectModalVisible(false);
       useDataStore.getState().invalidateCache();
-      Alert.alert('Success', `Successfully collected ${formatCurrency(activeLoan.dailyAmount)}!`);
+      Alert.alert(t('common.confirm'), t('payments.saveSuccess'));
       fetchCustomerDetails();
     } catch (err: any) {
-      const msg = err?.response?.data?.error ?? 'Failed to collect payment.';
-      Alert.alert('Collection Failed', msg);
+      const msg = err?.response?.data?.error ?? t('payments.saveFailed');
+      Alert.alert(t('payments.saveFailed'), msg);
     } finally {
       setCollecting(false);
     }
@@ -226,25 +226,29 @@ export default function CustomerDetailScreen() {
                 <View style={styles.notStartedHeaderRow}>
                   <View style={styles.notStartedHeaderLeft}>
                     <View style={styles.notStartedBadge}>
-                      <Text style={styles.notStartedBadgeText}>NOT STARTED</Text>
+                      <Text style={styles.notStartedBadgeText}>{t('loans.notStarted')}</Text>
                     </View>
                     <Text style={styles.notStartedTitle}>
-                      Starting in {daysUntilStart} {daysUntilStart === 1 ? 'day' : 'days'}
+                      {t('loans.startingIn', { count: daysUntilStart })}
                     </Text>
-                    <Text style={styles.notStartedSubtitle}>Starts on {startDateDisplay}</Text>
+                    <Text style={styles.notStartedSubtitle}>
+                      {t('loans.startsOn', { date: startDateDisplay })}
+                    </Text>
                   </View>
-                  <Text style={styles.loanNumberLabel}>LOAN #{activeLoan.loanNumber}</Text>
+                  <Text style={styles.loanNumberLabel}>
+                    {t('loans.loanNumber', { number: activeLoan.loanNumber })}
+                  </Text>
                 </View>
 
                 <View style={styles.notStartedDivider} />
 
                 <View style={styles.notStartedTermsRow}>
                   <Text style={styles.termsAmountText}>
-                    {formatCurrency(activeLoan.dailyAmount)}/day
+                    {formatCurrency(activeLoan.dailyAmount)} / {t('loans.day')}
                   </Text>
-                  <Text style={styles.termsSeparatorText}> for </Text>
+                  <Text style={styles.termsSeparatorText}> • </Text>
                   <Text style={styles.termsDurationText}>
-                    {activeLoan.totalDays} days
+                    {activeLoan.totalDays} {t('loans.day', { count: activeLoan.totalDays })}
                   </Text>
                 </View>
               </View>
@@ -254,15 +258,19 @@ export default function CustomerDetailScreen() {
               <View style={styles.loanCardHeader}>
                 <View style={[styles.statusBadge, { borderColor: todayStatusColor }]}>
                   <Text style={[styles.statusBadgeText, { color: todayStatusColor }]}>
-                    {todayStatusLabel}
+                    {t(`loans.status.${todayStatusLabel.toLowerCase()}`, { defaultValue: todayStatusLabel })}
                   </Text>
                 </View>
-                <Text style={styles.loanNumberLabel}>LOAN #{activeLoan.loanNumber}</Text>
+                <Text style={styles.loanNumberLabel}>
+                  {t('loans.loanNumber', { number: activeLoan.loanNumber })}
+                </Text>
               </View>
 
               {/* Row 2: Day counter (left) | 3-dot menu (right) */}
               <View style={styles.dayCounterRow}>
-                <Text style={styles.dayCounter}>Day {dayNumber} of {activeLoan.totalDays}</Text>
+                <Text style={styles.dayCounter}>
+                  {t('loans.dayCounter', { day: dayNumber, total: activeLoan.totalDays })}
+                </Text>
                 <TouchableOpacity
                   style={styles.threeDotBtn}
                   onPress={() => setIsLoanMgmtVisible(true)}
@@ -273,13 +281,13 @@ export default function CustomerDetailScreen() {
 
               <View style={styles.detailsTable}>
                 <View style={styles.tableRow}>
-                  <Text style={styles.tableLabel}>Today's collection:</Text>
+                  <Text style={styles.tableLabel}>{t('loans.todayCollection')}</Text>
                   <Text style={[styles.tableValue, { color: colors.statusPaid }]}>
                     {formatCurrency(activeLoan.dailyAmount)}
                   </Text>
                 </View>
                 <View style={styles.tableRow}>
-                  <Text style={styles.tableLabel}>Pending:</Text>
+                  <Text style={styles.tableLabel}>{t('loans.pending')}</Text>
                   <Text style={[styles.tableValue, { color: colors.statusPending }]}>
                     {formatCurrency(pendingAmount)}
                   </Text>
@@ -290,8 +298,8 @@ export default function CustomerDetailScreen() {
           ) : (
             <View style={styles.noLoanCard}>
               <Ionicons name="alert-circle-outline" size={48} color={colors.textSecondary} />
-              <Text style={styles.noLoanTitle}>No Active Loan</Text>
-              <Text style={styles.noLoanText}>This customer does not have any active loan right now.</Text>
+              <Text style={styles.noLoanTitle}>{t('loans.noActiveLoan')}</Text>
+              <Text style={styles.noLoanText}>{t('loans.noActiveLoanDesc')}</Text>
               <TouchableOpacity 
                 style={styles.createLoanBtn} 
                 onPress={() => router.push({
@@ -303,7 +311,7 @@ export default function CustomerDetailScreen() {
                   }
                 })}
               >
-                <Text style={styles.createLoanBtnText}>CREATE LOAN</Text>
+                <Text style={styles.createLoanBtnText}>{t('loans.createLoan')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -323,7 +331,9 @@ export default function CustomerDetailScreen() {
                   <View style={styles.btnContent}>
                     <Ionicons name="add-circle" size={24} color={colors.white} />
                     <Text style={styles.collectBtnText}>
-                      {hasPaymentToday ? 'PAID TODAY' : `COLLECT ${formatCurrency(activeLoan.dailyAmount)}`}
+                      {hasPaymentToday 
+                        ? t('loans.paidToday') 
+                        : `${t('loans.collect')} ${formatCurrency(activeLoan.dailyAmount)}`}
                     </Text>
                   </View>
                 )}
@@ -337,7 +347,7 @@ export default function CustomerDetailScreen() {
               >
                 <Ionicons name="keypad-outline" size={20} color={hasPaymentToday ? colors.textMuted : colors.primary} />
                 <Text style={[styles.enterAmountBtnText, hasPaymentToday && { color: colors.textMuted }]}>
-                  ENTER AMOUNT
+                  {t('payments.enterAmount')}
                 </Text>
               </TouchableOpacity>
 
@@ -353,7 +363,7 @@ export default function CustomerDetailScreen() {
                 })}
               >
                 <Ionicons name="time-outline" size={20} color={colors.primary} />
-                <Text style={styles.historyBtnText}>VIEW LOAN HISTORY</Text>
+                <Text style={styles.historyBtnText}>{t('loans.history')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -386,7 +396,7 @@ export default function CustomerDetailScreen() {
             <View style={styles.loanMgmtSheet}>
               {/* Sheet Header */}
               <View style={styles.loanMgmtHeader}>
-                <Text style={styles.loanMgmtTitle}>LOAN MANAGEMENT</Text>
+                <Text style={styles.loanMgmtTitle}>{t('loans.loanManagement')}</Text>
                 <TouchableOpacity onPress={() => setIsLoanMgmtVisible(false)}>
                   <Ionicons name="close" size={24} color={colors.textPrimary} />
                 </TouchableOpacity>
@@ -409,7 +419,7 @@ export default function CustomerDetailScreen() {
                 }}
               >
                 <Ionicons name="trash-outline" size={22} color="#dc2626" />
-                <Text style={[styles.loanMgmtOptionText, { color: '#dc2626' }]}>CLOSE LOAN</Text>
+                <Text style={[styles.loanMgmtOptionText, { color: '#dc2626' }]}>{t('loans.closeLoan')}</Text>
               </TouchableOpacity>
 
               {/* Option 2: Close & Rollover */}
@@ -430,7 +440,7 @@ export default function CustomerDetailScreen() {
                 }}
               >
                 <Ionicons name="sync-outline" size={22} color="#b45309" />
-                <Text style={[styles.loanMgmtOptionText, { color: '#b45309' }]}>CLOSE & ROLLOVER</Text>
+                <Text style={[styles.loanMgmtOptionText, { color: '#b45309' }]}>{t('loans.closeAndRollover')}</Text>
               </TouchableOpacity>
             </View>
           </TouchableOpacity>

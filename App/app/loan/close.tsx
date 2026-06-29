@@ -11,12 +11,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { loansApi } from '../../src/api/loans.api';
 import { useDataStore } from '../../src/store/dataStore';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
 
 export default function CloseLoanScreen() {
+  const { t } = useTranslation();
   const { loanId, customerName, principalAmount, totalPaid } =
     useLocalSearchParams<{
       loanId: string;
@@ -33,12 +35,12 @@ export default function CloseLoanScreen() {
 
   const handleCloseLoan = async () => {
     Alert.alert(
-      'Confirm Close Loan',
+      t('closeLoanScreen.closeBtn'),
       `This will permanently close the loan for ${customerName}. The remaining balance of ${formatCurrency(remainingBalance)} will be settled. This action cannot be undone.`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Close Loan',
+          text: t('closeLoanScreen.closeBtn'),
           style: 'destructive',
           onPress: async () => {
             setClosing(true);
@@ -49,7 +51,7 @@ export default function CloseLoanScreen() {
               router.back();
             } catch (err: any) {
               const msg = err?.response?.data?.error ?? 'Failed to close loan.';
-              Alert.alert('Error', msg);
+              Alert.alert(t('common.error'), msg);
             } finally {
               setClosing(false);
             }
@@ -67,7 +69,7 @@ export default function CloseLoanScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          CLOSE LOAN — {customerName?.toUpperCase()}
+          {t('closeLoanScreen.title', { name: customerName?.toUpperCase() })}
         </Text>
         <View style={styles.headerBtn} />
       </View>
@@ -78,18 +80,18 @@ export default function CloseLoanScreen() {
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Ionicons name="document-text-outline" size={16} color={colors.textSecondary} />
-            <Text style={styles.summaryHeaderText}>CURRENT LOAN SUMMARY</Text>
+            <Text style={styles.summaryHeaderText}>{t('closeLoanScreen.currentSummary')}</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Original Amount</Text>
+            <Text style={styles.summaryLabel}>{t('closeLoanScreen.originalAmount')}</Text>
             <Text style={styles.summaryValue}>{formatCurrency(parsedPrincipal)}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Paid to Date</Text>
+            <Text style={styles.summaryLabel}>{t('closeLoanScreen.paidToDate')}</Text>
             <Text style={[styles.summaryValue, { color: colors.statusPaid }]}>
               {formatCurrency(parsedTotalPaid)}
             </Text>
@@ -98,19 +100,19 @@ export default function CloseLoanScreen() {
 
         {/* Remaining Balance Hero Block */}
         <View style={styles.balanceHero}>
-          <Text style={styles.balanceHeroLabel}>REMAINING BALANCE</Text>
+          <Text style={styles.balanceHeroLabel}>{t('closeLoanScreen.remainingBalance')}</Text>
           <Text style={styles.balanceHeroAmount}>{formatCurrency(remainingBalance)}</Text>
-          <Text style={styles.balanceHeroSub}>Final settlement amount due</Text>
+          <Text style={styles.balanceHeroSub}>{t('closeLoanScreen.settlementDue')}</Text>
         </View>
 
         {/* Warning Card */}
         <View style={styles.warningCard}>
           <View style={styles.warningRow}>
             <Ionicons name="warning-outline" size={20} color="#dc2626" />
-            <Text style={styles.warningTitle}>Important Note</Text>
+            <Text style={styles.warningTitle}>{t('closeLoanScreen.importantNote')}</Text>
           </View>
           <Text style={styles.warningText}>
-            Closing this loan will settle the account. This action cannot be undone.
+            {t('closeLoanScreen.warningText')}
           </Text>
         </View>
 
@@ -128,7 +130,7 @@ export default function CloseLoanScreen() {
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={22} color={colors.white} />
-              <Text style={styles.closeBtnText}>Close Loan</Text>
+              <Text style={styles.closeBtnText}>{t('closeLoanScreen.closeBtn')}</Text>
             </>
           )}
         </TouchableOpacity>

@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import '../src/i18n';
 import { useAuthStore } from '../src/store/authStore';
 import { useSyncStore } from '../src/store/syncStore';
+import { useUIStore } from '../src/store/uiStore';
 import colors from '../src/theme/colors';
 import NewCustomerToast from '../src/components/NewCustomerToast';
 
@@ -15,9 +16,11 @@ export default function RootLayout() {
   const loadStoredSession = useAuthStore((s) => s.loadStoredSession);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const startNetworkWatch = useSyncStore((s) => s.startNetworkWatch);
+  const loadLanguage = useUIStore((s) => s.loadLanguage);
 
   useEffect(() => {
     const init = async () => {
+      await loadLanguage();
       await loadStoredSession();
       SplashScreen.hideAsync();
     };

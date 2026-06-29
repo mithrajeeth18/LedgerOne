@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { loansApi } from '../../src/api/loans.api';
 import { useDataStore } from '../../src/store/dataStore';
 import colors from '../../src/theme/colors';
@@ -20,6 +21,7 @@ import { formatCurrency } from '../../src/utils/formatCurrency';
 import CalendarModal from '../../src/components/CalendarModal';
 
 export default function RolloverLoanScreen() {
+  const { t } = useTranslation();
   const { loanId, customerName, groupId, principalAmount, totalPaid } =
     useLocalSearchParams<{
       loanId: string;
@@ -67,11 +69,11 @@ export default function RolloverLoanScreen() {
 
   const handleConfirm = async () => {
     if (parsedDuration <= 0) {
-      Alert.alert('Validation', 'Please enter a valid duration (days).');
+      Alert.alert(t('common.confirm'), 'Please enter a valid duration (days).');
       return;
     }
     if (parsedRate < 0) {
-      Alert.alert('Validation', 'Interest rate cannot be negative.');
+      Alert.alert(t('common.confirm'), 'Interest rate cannot be negative.');
       return;
     }
 
@@ -88,7 +90,7 @@ export default function RolloverLoanScreen() {
       router.back();
     } catch (err: any) {
       const msg = err?.response?.data?.error ?? 'Failed to create rollover loan.';
-      Alert.alert('Error', msg);
+      Alert.alert(t('common.error'), msg);
     } finally {
       setSubmitting(false);
     }
@@ -102,7 +104,7 @@ export default function RolloverLoanScreen() {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>
-          ROLLOVER — {customerName?.toUpperCase()}
+          {t('rolloverScreen.title', { name: customerName?.toUpperCase() })}
         </Text>
         <View style={styles.headerBtn} />
       </View>
@@ -113,19 +115,19 @@ export default function RolloverLoanScreen() {
         <View style={styles.infoBanner}>
           <Ionicons name="information-circle-outline" size={18} color={colors.textSecondary} />
           <Text style={styles.infoText}>
-            Rolling over will close the current loan and carry the remaining balance into a new loan agreement.
+            {t('rolloverScreen.banner')}
           </Text>
         </View>
 
         {/* Current Loan Summary */}
         <View style={styles.summaryCard}>
-          <Text style={styles.sectionLabel}>CURRENT LOAN SUMMARY</Text>
+          <Text style={styles.sectionLabel}>{t('closeLoanScreen.currentSummary')}</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryRowLabel}>Original Amount</Text>
+            <Text style={styles.summaryRowLabel}>{t('closeLoanScreen.originalAmount')}</Text>
             <Text style={styles.summaryRowValue}>{formatCurrency(parsedPrincipal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryRowLabel}>Paid to Date</Text>
+            <Text style={styles.summaryRowLabel}>{t('closeLoanScreen.paidToDate')}</Text>
             <Text style={[styles.summaryRowValue, { color: colors.statusPaid }]}>
               {formatCurrency(parsedTotalPaid)}
             </Text>
@@ -133,7 +135,7 @@ export default function RolloverLoanScreen() {
           <View style={styles.divider} />
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryRowLabel, { fontWeight: '800', color: colors.textPrimary }]}>
-              Remaining Balance
+              {t('closeLoanScreen.remainingBalance')}
             </Text>
             <Text style={[styles.summaryRowValue, { fontWeight: '800', color: colors.textPrimary }]}>
               {formatCurrency(carriedBalance)}
@@ -144,13 +146,13 @@ export default function RolloverLoanScreen() {
         {/* New Loan Details */}
         <View style={styles.newLoanCard}>
           <View style={styles.newLoanHeader}>
-            <Text style={styles.newLoanHeaderText}>NEW LOAN DETAILS</Text>
+            <Text style={styles.newLoanHeaderText}>{t('loans.addLoan').toUpperCase()}</Text>
           </View>
 
           <View style={styles.inputGrid}>
             {/* Additional Principal */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Additional Principal</Text>
+              <Text style={styles.inputLabel}>{t('rolloverScreen.additionalPrincipal')}</Text>
               <TextInput
                 style={styles.input}
                 value={additionalAmount}
@@ -163,7 +165,7 @@ export default function RolloverLoanScreen() {
 
             {/* Interest Rate */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Interest %</Text>
+              <Text style={styles.inputLabel}>{t('rolloverScreen.interestPercent')}</Text>
               <TextInput
                 style={styles.input}
                 value={interestRate}
@@ -176,7 +178,7 @@ export default function RolloverLoanScreen() {
 
             {/* Duration */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Duration (Days)</Text>
+              <Text style={styles.inputLabel}>{t('rolloverScreen.duration')}</Text>
               <TextInput
                 style={styles.input}
                 value={durationDays}
@@ -189,7 +191,7 @@ export default function RolloverLoanScreen() {
 
             {/* Start Date */}
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Start Date</Text>
+              <Text style={styles.inputLabel}>{t('rolloverScreen.startDate')}</Text>
               <TouchableOpacity
                 style={styles.dateBtn}
                 onPress={() => setIsDatePickerVisible(true)}
@@ -203,32 +205,32 @@ export default function RolloverLoanScreen() {
 
         {/* Rollover Calculation */}
         <View style={styles.calcCard}>
-          <Text style={styles.calcTitle}>Rollover Calculation</Text>
+          <Text style={styles.calcTitle}>{t('rolloverScreen.calculation')}</Text>
 
           <View style={styles.calcRow}>
-            <Text style={styles.calcLabel}>Carried Balance</Text>
+            <Text style={styles.calcLabel}>{t('rolloverScreen.carriedBalance')}</Text>
             <Text style={styles.calcValue}>{formatCurrency(carriedBalance)}</Text>
           </View>
           <View style={styles.calcRow}>
-            <Text style={styles.calcLabel}>+ New Amount</Text>
+            <Text style={styles.calcLabel}>+ {t('loans.principal')}</Text>
             <Text style={styles.calcValue}>{formatCurrency(parsedAdditional)}</Text>
           </View>
           <View style={styles.calcRow}>
-            <Text style={styles.calcLabel}>+ Interest ({parsedRate}%)</Text>
+            <Text style={styles.calcLabel}>+ {t('loans.interest')} ({parsedRate}%)</Text>
             <Text style={styles.calcValue}>{formatCurrency(interestAmount)}</Text>
           </View>
 
           <View style={styles.calcDivider} />
 
           <View style={[styles.calcRow, styles.calcHighlightRow]}>
-            <Text style={styles.calcHighlightLabel}>COMBINED PRINCIPAL</Text>
+            <Text style={styles.calcHighlightLabel}>{t('rolloverScreen.combinedPrincipal')}</Text>
             <Text style={styles.calcHighlightValue}>{formatCurrency(combinedPrincipal)}</Text>
           </View>
 
           <View style={[styles.calcRow, styles.calcDailyRow]}>
-            <Text style={styles.calcDailyLabel}>NEW DAILY COLLECTION</Text>
+            <Text style={styles.calcDailyLabel}>{t('rolloverScreen.newDailyCollection')}</Text>
             <Text style={styles.calcDailyValue}>
-              {formatCurrency(newDailyAmount)}/day
+              {formatCurrency(newDailyAmount)} / {t('loans.day')}
             </Text>
           </View>
         </View>
@@ -247,7 +249,7 @@ export default function RolloverLoanScreen() {
           ) : (
             <>
               <Ionicons name="checkmark-circle" size={22} color={colors.white} />
-              <Text style={styles.confirmBtnText}>Confirm & Create New Loan</Text>
+              <Text style={styles.confirmBtnText}>{t('rolloverScreen.confirmBtn')}</Text>
             </>
           )}
         </TouchableOpacity>

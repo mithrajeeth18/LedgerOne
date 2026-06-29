@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { groupsApi, DashboardCustomer } from '../../src/api/groups.api';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
+import { useTranslation } from 'react-i18next';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -80,6 +81,7 @@ const STATUS_CONFIG: Record<PaymentStatus, { color: string; label: string }> = {
 // ─── Main Screen ─────────────────────────────────────────────────────────────
 
 export default function GroupDetailScreen() {
+  const { t } = useTranslation();
   const { id, groupName: paramName, fromHome } = useLocalSearchParams<{
     id: string;
     groupName?: string;
@@ -405,7 +407,7 @@ export default function GroupDetailScreen() {
 
           {/* Sheet header */}
           <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>FILTER CUSTOMERS</Text>
+            <Text style={styles.sheetTitle}>{t('filters.title')}</Text>
             <TouchableOpacity
               onPress={() => setFilterSheetVisible(false)}
               style={styles.sheetCloseBtn}
@@ -415,13 +417,13 @@ export default function GroupDetailScreen() {
           </View>
 
           {/* ── LOAN STATUS ── */}
-          <Text style={styles.sectionLabel}>LOAN STATUS</Text>
+          <Text style={styles.sectionLabel}>{t('filters.loanStatus')}</Text>
           <View style={styles.segmentRow}>
             {(['all', 'active', 'no_loan'] as LoanFilter[]).map((val) => {
               const labels: Record<LoanFilter, string> = {
-                all: 'ALL',
-                active: 'ACTIVE LOAN',
-                no_loan: 'NO LOAN',
+                all: t('filters.all'),
+                active: t('filters.activeLoan'),
+                no_loan: t('filters.noLoan'),
               };
               const active = draftLoan === val;
               return (
@@ -446,17 +448,17 @@ export default function GroupDetailScreen() {
           {/* ── PAYMENT FOCUS (only when active loan selected) ── */}
           {draftLoan === 'active' && (
             <>
-              <Text style={[styles.sectionLabel, { marginTop: 20 }]}>PAYMENT FOCUS</Text>
+              <Text style={[styles.sectionLabel, { marginTop: 20 }]}>{t('filters.paymentFocus')}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.paymentFilterRow}
               >
                 {[
-                  { val: 'all'       as PaymentFilter, label: `ALL ACTIVE (${activeCards.length})`, color: colors.textPrimary },
-                  { val: 'pending'   as PaymentFilter, label: `PENDING (${pendingCount})`,           color: colors.statusPending },
-                  { val: 'underpaid' as PaymentFilter, label: `UNDERPAID (${underpaidCount})`,       color: colors.statusUnderpaid },
-                  { val: 'paid'      as PaymentFilter, label: `PAID (${paidCount})`,                 color: colors.statusPaid },
+                  { val: 'all'       as PaymentFilter, label: t('filters.allActive', { count: activeCards.length }), color: colors.textPrimary },
+                  { val: 'pending'   as PaymentFilter, label: t('filters.pendingCount', { count: pendingCount }),           color: colors.statusPending },
+                  { val: 'underpaid' as PaymentFilter, label: t('filters.underpaidCount', { count: underpaidCount }),       color: colors.statusUnderpaid },
+                  { val: 'paid'      as PaymentFilter, label: t('filters.paidCount', { count: paidCount }),                 color: colors.statusPaid },
                 ].map(({ val, label, color }) => {
                   const active = draftPayment === val;
                   return (
@@ -489,14 +491,14 @@ export default function GroupDetailScreen() {
               onPress={clearFilters}
               activeOpacity={0.8}
             >
-              <Text style={styles.clearBtnText}>CLEAR</Text>
+              <Text style={styles.clearBtnText}>{t('filters.clear')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.applyBtn}
               onPress={applyFilters}
               activeOpacity={0.85}
             >
-              <Text style={styles.applyBtnText}>APPLY FILTERS</Text>
+              <Text style={styles.applyBtnText}>{t('filters.apply')}</Text>
               <Ionicons name="filter" size={16} color={colors.white} />
             </TouchableOpacity>
           </View>

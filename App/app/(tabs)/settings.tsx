@@ -40,7 +40,7 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
         {/* ── Section 1: Security & Access ── */}
-        <Text style={styles.sectionHeader}>SECURITY & ACCESS</Text>
+        <Text style={styles.sectionHeader}>{t('settings.securityAccess')}</Text>
         <View style={styles.card}>
           {/* Row 1: Change PIN */}
           <TouchableOpacity 
@@ -50,7 +50,7 @@ export default function SettingsScreen() {
           >
             <View style={styles.rowLeft}>
               <Ionicons name="lock-closed-outline" size={22} color="#0b4619" />
-              <Text style={styles.rowLabel}>Change PIN</Text>
+              <Text style={styles.rowLabel}>{t('settings.changePin')}</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
           </TouchableOpacity>
@@ -62,8 +62,8 @@ export default function SettingsScreen() {
             <View style={styles.rowLeft}>
               <Ionicons name="finger-print-outline" size={22} color="#0b4619" />
               <View style={styles.textGroup}>
-                <Text style={styles.rowLabel}>Biometric Login</Text>
-                <Text style={styles.rowSubtitle}>Use fingerprint or face</Text>
+                <Text style={styles.rowLabel}>{t('settings.biometricLogin')}</Text>
+                <Text style={styles.rowSubtitle}>{t('settings.useBiometric')}</Text>
               </View>
             </View>
             <Switch
@@ -77,7 +77,7 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Section 2: Preferences ── */}
-        <Text style={styles.sectionHeader}>PREFERENCES</Text>
+        <Text style={styles.sectionHeader}>{t('settings.preferences')}</Text>
         <View style={styles.card}>
           {/* Row 1: Language */}
           <TouchableOpacity 
@@ -99,13 +99,13 @@ export default function SettingsScreen() {
         </View>
 
         {/* ── Section 3: System ── */}
-        <Text style={styles.sectionHeader}>SYSTEM</Text>
+        <Text style={styles.sectionHeader}>{t('settings.system')}</Text>
         <View style={styles.card}>
           {/* Row 1: App Version */}
           <View style={styles.row}>
             <View style={styles.rowLeft}>
               <Ionicons name="information-circle-outline" size={22} color="#0b4619" />
-              <Text style={styles.rowLabel}>App Version</Text>
+              <Text style={styles.rowLabel}>{t('settings.appVersion')}</Text>
             </View>
             <Text style={styles.versionValue}>v4.2.1-prod</Text>
           </View>
@@ -117,12 +117,12 @@ export default function SettingsScreen() {
             <View style={styles.rowLeft}>
               <Ionicons name="sync-outline" size={22} color="#0b4619" />
               <View style={styles.textGroup}>
-                <Text style={styles.rowLabel}>Database Sync</Text>
+                <Text style={styles.rowLabel}>{t('settings.databaseSync')}</Text>
                 <Text style={[
                   styles.rowSubtitle, 
                   { color: isOnline ? '#15803d' : colors.statusPending, fontWeight: '700' }
                 ]}>
-                  {isOnline ? 'Up to date' : 'Offline'}
+                  {isOnline ? t('settings.upToDate') : t('settings.offline')}
                 </Text>
               </View>
             </View>
@@ -133,7 +133,7 @@ export default function SettingsScreen() {
               activeOpacity={0.85}
             >
               <Text style={styles.syncBtnText}>
-                {isSyncing ? 'SYNCING...' : 'SYNC NOW'}
+                {isSyncing ? t('settings.syncing').toUpperCase() : t('settings.syncNow').toUpperCase()}
               </Text>
             </TouchableOpacity>
           </View>
@@ -146,7 +146,7 @@ export default function SettingsScreen() {
           activeOpacity={0.85}
         >
           <Ionicons name="log-out-outline" size={20} color="#dc2626" />
-          <Text style={styles.logoutBtnText}>LOGOUT</Text>
+          <Text style={styles.logoutBtnText}>{t('settings.logout')}</Text>
         </TouchableOpacity>
 
       </ScrollView>
@@ -164,7 +164,7 @@ export default function SettingsScreen() {
           onPress={() => setLangModalVisible(false)}
         >
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>SELECT LANGUAGE</Text>
+            <Text style={styles.modalTitle}>{t('settings.selectLanguage')}</Text>
             
             <TouchableOpacity 
               style={[styles.langOption, language === 'en' && styles.langOptionActive]}

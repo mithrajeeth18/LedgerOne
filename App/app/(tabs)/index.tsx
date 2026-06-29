@@ -15,6 +15,7 @@ import { paymentsApi } from '../../src/api/payments.api';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
 import { useAuthStore } from '../../src/store/authStore';
+import { useTranslation } from 'react-i18next';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,7 @@ interface GroupStats {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -158,7 +160,7 @@ export default function HomeScreen() {
         {/* ── Section 1: Total Collection Card ── */}
         <View style={styles.totalCard}>
           <View style={styles.totalCardHeader}>
-            <Text style={styles.totalCardLabel}>TODAY'S TOTAL COLLECTION</Text>
+            <Text style={styles.totalCardLabel}>{t('home.todaysTotalCollection')}</Text>
             <View style={styles.datePill}>
               <Text style={styles.datePillText}>{getDatePill()}</Text>
             </View>
@@ -171,14 +173,14 @@ export default function HomeScreen() {
           <View style={styles.modeSplitRow}>
             {/* Cash Box */}
             <View style={styles.modeBox}>
-              <Text style={styles.modeLabel}>CASH</Text>
+              <Text style={styles.modeLabel}>{t('payments.cash').toUpperCase()}</Text>
               <Text style={styles.modeValue}>
                 {formatCurrency(totals.totalCash)}
               </Text>
             </View>
             {/* Online Box */}
             <View style={styles.modeBox}>
-              <Text style={styles.modeLabel}>ONLINE</Text>
+              <Text style={styles.modeLabel}>{t('payments.online').toUpperCase()}</Text>
               <Text style={styles.modeValue}>
                 {formatCurrency(totals.totalOnline)}
               </Text>
@@ -190,7 +192,7 @@ export default function HomeScreen() {
           <View style={styles.cardFooter}>
             <Ionicons name="receipt-outline" size={16} color="rgba(255,255,255,0.7)" />
             <Text style={styles.cardFooterText}>
-              {paymentCount} payment{paymentCount !== 1 ? 's' : ''} recorded today
+              {t('home.paymentsRecorded', { count: paymentCount })}
             </Text>
           </View>
         </View>
@@ -198,13 +200,13 @@ export default function HomeScreen() {
         {/* ── Section 2: By Collector ── */}
         <View style={styles.sectionHeader}>
           <View style={styles.greenDot} />
-          <Text style={styles.sectionTitle}>BY COLLECTOR</Text>
+          <Text style={styles.sectionTitle}>{t('home.byCollector')}</Text>
         </View>
 
         <View style={styles.whiteCard}>
           {collectorEntries.length === 0 ? (
             <View style={styles.emptyRow}>
-              <Text style={styles.emptyText}>No collectors active today</Text>
+              <Text style={styles.emptyText}>{t('home.noCollectors')}</Text>
             </View>
           ) : (
             collectorEntries.map(([name, stats], idx) => {
@@ -224,12 +226,12 @@ export default function HomeScreen() {
                       <View style={styles.collectorInfo}>
                         <Text style={styles.collectorName}>
                           {name}
-                          {isMe && <Text style={styles.youTag}> (YOU)</Text>}
+                          {isMe && <Text style={styles.youTag}>{t('home.youLabel')}</Text>}
                         </Text>
                         <Text style={styles.collectorSub}>
                           {hasCollections
-                            ? `${stats.count} collection${stats.count !== 1 ? 's' : ''}`
-                            : 'No collections yet'}
+                            ? t('home.collectionsCount', { count: stats.count })
+                            : t('home.noCollectionsYet')}
                         </Text>
                       </View>
                     </View>
@@ -239,10 +241,10 @@ export default function HomeScreen() {
                         {formatCurrency(stats.totalAmount)}
                       </Text>
                       <Text style={styles.collectorBreakdown}>
-                        Cash {formatCurrency(stats.totalCash)}
+                        {t('home.cashLabel')} {formatCurrency(stats.totalCash)}
                       </Text>
                       <Text style={styles.collectorBreakdown}>
-                        Online {formatCurrency(stats.totalOnline)}
+                        {t('home.onlineLabel')} {formatCurrency(stats.totalOnline)}
                       </Text>
                     </View>
                   </View>
@@ -255,13 +257,13 @@ export default function HomeScreen() {
         {/* ── Section 3: By Group ── */}
         <View style={styles.sectionHeader}>
           <View style={styles.greenDot} />
-          <Text style={styles.sectionTitle}>BY GROUP</Text>
+          <Text style={styles.sectionTitle}>{t('home.byGroup')}</Text>
         </View>
 
         <View style={styles.whiteCard}>
           {groupEntries.length === 0 ? (
             <View style={styles.emptyRow}>
-              <Text style={styles.emptyText}>No groups active today</Text>
+              <Text style={styles.emptyText}>{t('home.noGroupsActive')}</Text>
             </View>
           ) : (
             groupEntries.map((group, idx) => {
@@ -315,10 +317,10 @@ export default function HomeScreen() {
                     {/* Line 2: X of Y collected & Expected Amount */}
                     <View style={styles.groupRowStats}>
                       <Text style={styles.collectedCountText}>
-                        {group.paidCustomersCount} of {group.totalActiveCustomers} collected
+                        {t('home.collectedRatio', { paid: group.paidCustomersCount, total: group.totalActiveCustomers })}
                       </Text>
                       <Text style={styles.expectedAmountText}>
-                        Expected {formatCurrency(group.expected)}
+                        {t('home.expectedLabel')} {formatCurrency(group.expected)}
                       </Text>
                     </View>
 
@@ -334,7 +336,7 @@ export default function HomeScreen() {
                     {/* Line 4: Cash/Online split & Optional Percentage Badge */}
                     <View style={styles.groupRowFooter}>
                       <Text style={styles.groupBreakdownText}>
-                        Cash {formatCurrency(group.totalCash)} · Online {formatCurrency(group.totalOnline)}
+                        {t('home.cashLabel')} {formatCurrency(group.totalCash)} · {t('home.onlineLabel')} {formatCurrency(group.totalOnline)}
                       </Text>
                       {!isCompleted && (
                         <View style={styles.percentBadge}>
