@@ -43,74 +43,50 @@ interface GroupStats {
   paidCustomersCount: number;
 }
 
+interface TodayPaymentsResponse {
+  totals: TotalStats;
+  byCollector: Record<string, CollectorStats>;
+  byGroup: Record<string, GroupStats>;
+  payments: any[];
+}
+
+import { useQuery } from '@tanstack/react-query';
+
+// ─── Format Date Pill ───
+const getDatePill = () => {
+  const today = new Date();
+  const day = today.getDate();
+  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+  return `${day} ${months[today.getMonth()]}`;
+};
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Stats State
-  const [totals, setTotals] = useState<TotalStats>({ totalCollected: 0, totalCash: 0, totalOnline: 0 });
-  const [collectors, setCollectors] = useState<Record<string, CollectorStats>>({});
-  const [groups, setGroups] = useState<Record<string, GroupStats>>({});
-  const [paymentCount, setPaymentCount] = useState(0);
-
-  // ─── Format Date Pill ───
-  const getDatePill = () => {
-    const today = new Date();
-    const day = today.getDate();
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${day} ${months[today.getMonth()]}`;
-  };
-
-  // ─── Load Stats ───
-  const loadStats = useCallback(async (isSilent = false) => {
-    if (!isSilent) {
-      setError(null);
-    }
-    try {
-      const { data } = await paymentsApi.getTodayPayments();
-      if (data) {
-        setTotals(data.totals ?? { totalCollected: 0, totalCash: 0, totalOnline: 0 });
-        setCollectors(data.byCollector ?? {});
-        setGroups(data.byGroup ?? {});
-        setPaymentCount(data.payments ? data.payments.length : 0);
-      }
-    } catch (err) {
-      console.error('[HomeScreen] Error loading today stats:', err);
-      if (!isSilent) {
-        setError("Could not load today's data. Pull down to refresh.");
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  // Fetch on mount
-  useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+  const { data, isLoading, isError, refetch } = useQuery<TodayPaymentsResponse>({
+    queryKey: ['payments', 'today'],
+    queryFn: async () => {
+      const res = await paymentsApi.getTodayPayments();
+      return res.data as TodayPaymentsResponse;
+    },
+    refetchInterval: 60000,
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
 
   // Pull to refresh handler
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    loadStats();
-  }, [loadStats]);
-
-  // Silent auto-refresh every 60 seconds
-  useEffect(() => {
-    const timer = setInterval(() => {
-      loadStats(true);
-    }, 60000);
-    return () => clearInterval(timer);
-  }, [loadStats]);
+    await refetch();
+    setRefreshing(false);
+  };
 
   // ─── Render States ───
-  if (loading && !refreshing) {
+  if (isLoading && !refreshing) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
@@ -120,7 +96,7 @@ export default function HomeScreen() {
     );
   }
 
-  if (error) {
+  if (isError) {
     return (
       <SafeAreaView style={styles.container}>
         <ScrollView
@@ -134,11 +110,16 @@ export default function HomeScreen() {
             />
           }
         >
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{t('common.error')}</Text>
         </ScrollView>
       </SafeAreaView>
     );
   }
+
+  const totals = data?.totals ?? { totalCollected: 0, totalCash: 0, totalOnline: 0 };
+  const collectors = data?.byCollector ?? {};
+  const groups = data?.byGroup ?? {};
+  const paymentCount = data?.payments ? data.payments.length : 0;
 
   const collectorEntries = Object.entries(collectors);
   const groupEntries = Object.values(groups);

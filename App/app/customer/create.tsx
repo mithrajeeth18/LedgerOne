@@ -15,6 +15,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { customersApi } from '../../src/api/customers.api';
 import colors from '../../src/theme/colors';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '../../src/store/dataStore';
 
 interface GroupItem {
@@ -23,6 +24,7 @@ interface GroupItem {
 }
 
 export default function CreateCustomerScreen() {
+  const queryClient = useQueryClient();
   const { groupId: paramGroupId } = useLocalSearchParams<{ groupId?: string }>();
   
   const [name, setName] = useState('');
@@ -84,6 +86,9 @@ export default function CreateCustomerScreen() {
       });
 
       // Clear cached customer & group data in store to force a refresh on navigation back
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', selectedGroupId] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
       useDataStore.getState().invalidateCache();
       
       // Save info in global store to show the popup toast on the returning screen

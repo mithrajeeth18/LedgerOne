@@ -34,13 +34,13 @@ interface ActiveLoan {
   status: string;
 }
 
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
 export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
-  const [customer, setCustomer] = useState<any>(null);
-  const [activeLoan, setActiveLoan] = useState<ActiveLoan | null>(null);
-  const [payments, setPayments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
+
   const [collecting, setCollecting] = useState(false);
 
   // States for instant collection mode selection modal
@@ -53,30 +53,28 @@ export default function CustomerDetailScreen() {
   // Loan Management sheet visibility
   const [isLoanMgmtVisible, setIsLoanMgmtVisible] = useState(false);
 
-  const fetchCustomerDetails = async () => {
-    try {
-      // 1. Fetch customer and active loan info
-      const { data } = await customersApi.getById(id);
-      setCustomer(data.customer);
-      setActiveLoan(data.activeLoan);
-
-      if (data.activeLoan) {
-        // 2. Fetch all payments for this loan (used for totalPaid + today status)
-        const { data: rawPayments } = await paymentsApi.getForLoan(data.activeLoan._id);
-        setPayments(rawPayments);
-        // Cache totalPaid so close/rollover screens don't re-query
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['customer_details', id],
+    queryFn: async () => {
+      const res = await customersApi.getById(id);
+      let paymentsList: any[] = [];
+      if (res.data.activeLoan) {
+        const { data: rawPayments } = await paymentsApi.getForLoan(res.data.activeLoan._id);
+        paymentsList = rawPayments;
       }
-    } catch (err) {
-      console.error('[CustomerDetail] Error fetching:', err);
-      Alert.alert(t('common.error'), t('common.error'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        customer: res.data.customer,
+        activeLoan: res.data.activeLoan,
+        payments: paymentsList,
+      };
+    },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
 
-  useEffect(() => {
-    fetchCustomerDetails();
-  }, [id]);
+  const customer = data?.customer;
+  const activeLoan = data?.activeLoan;
+  const payments = data?.payments ?? [];
 
   const handleCollect = () => {
     if (!activeLoan) return;
@@ -100,7 +98,10 @@ export default function CustomerDetailScreen() {
       setIsCollectModalVisible(false);
       useDataStore.getState().invalidateCache();
       Alert.alert(t('common.confirm'), t('payments.saveSuccess'));
-      fetchCustomerDetails();
+      queryClient.invalidateQueries({ queryKey: ['customer_details', id] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
     } catch (err: any) {
       const msg = err?.response?.data?.error ?? t('payments.saveFailed');
       Alert.alert(t('payments.saveFailed'), msg);
@@ -109,7 +110,7 @@ export default function CustomerDetailScreen() {
     }
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.loaderContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
@@ -374,10 +375,14 @@ export default function CustomerDetailScreen() {
           <PaymentModal
             bottomSheetRef={paymentSheetRef}
             loanId={activeLoan._id}
+            customerId={id}
             customerName={customer.name}
             dayNumber={dayNumber}
             expectedAmount={activeLoan.dailyAmount}
-            onPaymentSaved={fetchCustomerDetails}
+            onPaymentSaved={() => {
+              queryClient.invalidateQueries({ queryKey: ['customer_details', id] });
+              queryClient.invalidateQueries({ queryKey: ['payments', 'today'] });
+            }}
           />
         )}
 

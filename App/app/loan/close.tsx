@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { loansApi } from '../../src/api/loans.api';
 import { useDataStore } from '../../src/store/dataStore';
 import colors from '../../src/theme/colors';
@@ -19,6 +20,7 @@ import { formatCurrency } from '../../src/utils/formatCurrency';
 
 export default function CloseLoanScreen() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { loanId, customerName, principalAmount, totalPaid } =
     useLocalSearchParams<{
       loanId: string;
@@ -46,6 +48,9 @@ export default function CloseLoanScreen() {
             setClosing(true);
             try {
               await loansApi.close(loanId);
+              queryClient.invalidateQueries({ queryKey: ['customer_details'] });
+              queryClient.invalidateQueries({ queryKey: ['groups'] });
+              queryClient.invalidateQueries({ queryKey: ['payments', 'today'] });
               useDataStore.getState().invalidateCache();
               // Navigate back to customer profile — it will re-render with no active loan
               router.back();

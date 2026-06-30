@@ -16,10 +16,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { loansApi } from '../../src/api/loans.api';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
+import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '../../src/store/dataStore';
 import CalendarModal from '../../src/components/CalendarModal';
 
 export default function CreateLoanScreen() {
+  const queryClient = useQueryClient();
   const { customerId, customerName, groupId } = useLocalSearchParams<{
     customerId: string;
     customerName: string;
@@ -111,6 +113,9 @@ export default function CreateLoanScreen() {
       });
 
       // Invalidate cached groups and customers to trigger updates on next fetch
+      queryClient.invalidateQueries({ queryKey: ['customer_details', customerId] });
+      queryClient.invalidateQueries({ queryKey: ['customers', groupId] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
       useDataStore.getState().invalidateCache();
 
       Alert.alert('Success', 'Loan created successfully!');

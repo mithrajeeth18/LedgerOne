@@ -13,7 +13,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useDataStore } from '../../src/store/dataStore';
+import { useTranslation } from 'react-i18next';
+import { groupsApi } from '../../src/api/groups.api';
+import { customersApi } from '../../src/api/customers.api';
+import { paymentsApi } from '../../src/api/payments.api';
 import colors from '../../src/theme/colors';
 
 interface GroupData {
@@ -24,68 +27,82 @@ interface GroupData {
   paidCount: number;
 }
 
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+
 export default function GroupsScreen() {
-  const [groups, setGroups] = useState<GroupData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { t } = useTranslation();
   const [refreshing, setRefreshing] = useState(false);
 
-  const { fetchGroups, fetchCustomers, fetchTodayPayments } = useDataStore();
+  const groupsQuery = useQuery({
+    queryKey: ['groups'],
+    queryFn: async () => {
+      const res = await groupsApi.getAll();
+      return res.data;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: Infinity,
+  });
 
-  const fetchGroupStats = async (force = false) => {
-    try {
-      // 1. Fetch from memory/cache (or API if forced)
-      const rawGroups = await fetchGroups(force);
-      const customersList = await fetchCustomers(force);
-      const todayPayments = await fetchTodayPayments(force);
+  const customersQuery = useQuery({
+    queryKey: ['customers', 'all'],
+    queryFn: async () => {
+      const res = await customersApi.getAll({ limit: 1000 });
+      return res.data.customers ?? res.data;
+    },
+    staleTime: 10 * 60 * 1000,
+    gcTime: Infinity,
+  });
 
-      // Map group statistics
-      const mappedGroups: GroupData[] = rawGroups.map((g: any) => {
-        // Filter customers in this group
-        const groupCustomers = customersList.filter((c: any) => {
-          const cid = typeof c.groupId === 'string' ? c.groupId : c.groupId?._id;
-          return cid === g._id;
-        });
+  const paymentsQuery = useQuery({
+    queryKey: ['payments', 'today_raw'],
+    queryFn: async () => {
+      const res = await paymentsApi.getTodayPayments();
+      return res.data.payments ?? res.data;
+    },
+    staleTime: 30000,
+  });
 
-        // Filter active loan customers in this group
-        const activeLoanCustomers = groupCustomers.filter(
-          (c: any) => c.activeLoan !== null && c.activeLoan !== undefined
-        );
+  const isLoading = groupsQuery.isLoading || customersQuery.isLoading || paymentsQuery.isLoading;
+  const isError = groupsQuery.isError || customersQuery.isError || paymentsQuery.isError;
 
-        // Count payments collected today for this group
-        const groupPayments = todayPayments.filter((p: any) => {
-          const pgid = typeof p.loanId?.groupId === 'string' 
-            ? p.loanId.groupId 
-            : p.loanId?.groupId?._id;
-          return pgid === g._id;
-        });
-
-        return {
-          _id: g._id,
-          name: g.name,
-          customerCount: groupCustomers.length,
-          activeLoanCount: activeLoanCustomers.length,
-          paidCount: groupPayments.length,
-        };
+  const groups: GroupData[] = useMemo(() => {
+    if (!groupsQuery.data || !customersQuery.data || !paymentsQuery.data) return [];
+    return groupsQuery.data.map((g: any) => {
+      const groupCustomers = customersQuery.data.filter((c: any) => {
+        const cid = typeof c.groupId === 'string' ? c.groupId : c.groupId?._id;
+        return cid === g._id;
       });
 
-      setGroups(mappedGroups);
-    } catch (err) {
-      console.error('[GroupsStats] Fetch error:', err);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+      const activeLoanCustomers = groupCustomers.filter(
+        (c: any) => c.activeLoan !== null && c.activeLoan !== undefined
+      );
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchGroupStats();
-    }, [])
-  );
+      const groupPayments = paymentsQuery.data.filter((p: any) => {
+        const pgid = typeof p.loanId?.groupId === 'string' 
+          ? p.loanId.groupId 
+          : p.loanId?.groupId?._id;
+        return pgid === g._id;
+      });
 
-  const handleRefresh = () => {
+      return {
+        _id: g._id,
+        name: g.name,
+        customerCount: groupCustomers.length,
+        activeLoanCount: activeLoanCustomers.length,
+        paidCount: groupPayments.length,
+      };
+    });
+  }, [groupsQuery.data, customersQuery.data, paymentsQuery.data]);
+
+  const handleRefresh = async () => {
     setRefreshing(true);
-    fetchGroupStats(true); // force API refresh
+    await Promise.all([
+      groupsQuery.refetch(),
+      customersQuery.refetch(),
+      paymentsQuery.refetch(),
+    ]);
+    setRefreshing(false);
   };
 
   const renderGroupItem = ({ item }: { item: GroupData }) => {
@@ -145,7 +162,7 @@ export default function GroupsScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {isLoading ? (
         <ActivityIndicator style={styles.loader} color={colors.primary} size="large" />
       ) : (
         <FlatList

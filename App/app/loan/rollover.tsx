@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useQueryClient } from '@tanstack/react-query';
 import { loansApi } from '../../src/api/loans.api';
 import { useDataStore } from '../../src/store/dataStore';
 import colors from '../../src/theme/colors';
@@ -22,6 +23,7 @@ import CalendarModal from '../../src/components/CalendarModal';
 
 export default function RolloverLoanScreen() {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
   const { loanId, customerName, groupId, principalAmount, totalPaid } =
     useLocalSearchParams<{
       loanId: string;
@@ -85,6 +87,9 @@ export default function RolloverLoanScreen() {
         totalDays:    parsedDuration,
         startDate:    toISODate(startDate),
       });
+      queryClient.invalidateQueries({ queryKey: ['customer_details'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      queryClient.invalidateQueries({ queryKey: ['payments', 'today'] });
       useDataStore.getState().invalidateCache();
       // Go back to customer profile — it will show the new active loan
       router.back();

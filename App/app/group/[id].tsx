@@ -78,7 +78,8 @@ const STATUS_CONFIG: Record<PaymentStatus, { color: string; label: string }> = {
   NO_LOAN:     { color: colors.statusInactive,   label: 'NO LOAN'     },
 };
 
-// ─── Main Screen ─────────────────────────────────────────────────────────────
+import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 export default function GroupDetailScreen() {
   const { t } = useTranslation();
@@ -88,11 +89,7 @@ export default function GroupDetailScreen() {
     fromHome?: string;
   }>();
 
-  const [groupName, setGroupName]   = useState(paramName ?? '…');
-  const [allCards, setAllCards]     = useState<CustomerCard[]>([]);
-  const [loading, setLoading]       = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError]           = useState<string | null>(null);
   const [search, setSearch]         = useState('');
 
   // ─── Filter state ─────────────────────────────────────────────────────────
@@ -107,56 +104,51 @@ export default function GroupDetailScreen() {
 
   // ─── Fetch ───────────────────────────────────────────────────────────────
 
-  const fetchDashboard = useCallback(async () => {
-    setError(null);
-    try {
-      const { data } = await groupsApi.getDashboard(id);
+  const { data, isLoading, isError, refetch } = useQuery({
+    queryKey: ['customers', id],
+    queryFn: async () => {
+      const res = await groupsApi.getDashboard(id);
+      return res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: Infinity,
+  });
 
-      setGroupName(data.group.name);
+  const groupName = data?.group?.name ?? paramName ?? '…';
 
-      const cards: CustomerCard[] = data.customers.map((c) => {
-        const status = resolveStatus(c);
-        let paidAmount = 0;
-        let pendingAmount = 0;
+  const allCards = useMemo(() => {
+    if (!data?.customers) return [];
+    const cards: CustomerCard[] = data.customers.map((c: any) => {
+      const status = resolveStatus(c);
+      let paidAmount = 0;
+      let pendingAmount = 0;
 
-        if (c.activeLoan) {
-          pendingAmount = c.activeLoan.dailyAmount;
-          if (c.todayPayment) {
-            paidAmount = c.todayPayment.paidAmount;
-            pendingAmount = Math.max(0, c.activeLoan.dailyAmount - c.todayPayment.paidAmount);
-          }
+      if (c.activeLoan) {
+        pendingAmount = c.activeLoan.dailyAmount;
+        if (c.todayPayment) {
+          paidAmount = c.todayPayment.paidAmount;
+          pendingAmount = Math.max(0, c.activeLoan.dailyAmount - c.todayPayment.paidAmount);
         }
+      }
 
-        return {
-          _id: c._id,
-          name: c.name,
-          phone: c.phone,
-          status,
-          loanNumber: c.activeLoan?.loanNumber || undefined,
-          paidAmount,
-          pendingAmount,
-        };
-      });
+      return {
+        _id: c._id,
+        name: c.name,
+        phone: c.phone,
+        status,
+        loanNumber: c.activeLoan?.loanNumber || undefined,
+        paidAmount,
+        pendingAmount,
+      };
+    });
 
-      setAllCards(sortCustomers(cards));
-    } catch (err) {
-      console.error('[GroupDashboard] fetch error:', err);
-      setError('Could not load customers. Pull down to refresh.');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, [id]);
+    return sortCustomers(cards);
+  }, [data]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchDashboard();
-    }, [fetchDashboard])
-  );
-
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    fetchDashboard();
+    await refetch();
+    setRefreshing(false);
   };
 
   // ─── Filter sheet handlers ────────────────────────────────────────────────
@@ -348,13 +340,13 @@ export default function GroupDetailScreen() {
       </View>
 
       {/* ── Body ── */}
-      {loading ? (
+      {isLoading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      ) : error ? (
+      ) : isError ? (
         <View style={styles.centered}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{t('common.error')}</Text>
           <TouchableOpacity style={styles.retryBtn} onPress={handleRefresh}>
             <Ionicons name="refresh" size={18} color={colors.white} />
             <Text style={styles.retryBtnText}>Retry</Text>

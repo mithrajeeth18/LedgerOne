@@ -9,6 +9,18 @@ import { useSyncStore } from '../src/store/syncStore';
 import { useUIStore } from '../src/store/uiStore';
 import colors from '../src/theme/colors';
 import NewCustomerToast from '../src/components/NewCustomerToast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30000, // 30 seconds
+      gcTime: 300000,   // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: true,
+    },
+  },
+});
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,16 +42,18 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="group/[id]" />
-        <Stack.Screen name="customer/[id]" />
-        <Stack.Screen name="loan/[id]" />
-      </Stack>
-      <NewCustomerToast />
-    </GestureHandlerRootView>
+    <QueryClientProvider client={queryClient}>
+      <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.background }}>
+        <StatusBar style="dark" />
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(auth)" />
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="group/[id]" />
+          <Stack.Screen name="customer/[id]" />
+          <Stack.Screen name="loan/[id]" />
+        </Stack>
+        <NewCustomerToast />
+      </GestureHandlerRootView>
+    </QueryClientProvider>
   );
 }

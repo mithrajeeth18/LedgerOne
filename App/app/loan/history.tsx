@@ -14,6 +14,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { loansApi } from '../../src/api/loans.api';
 import { paymentsApi } from '../../src/api/payments.api';
 import PaymentModal from '../../src/components/PaymentModal';
@@ -95,9 +96,7 @@ export default function LoanHistoryScreen() {
     customerName: string;
   }>();
 
-  const [loan, setLoan]         = useState<Loan | null>(null);
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loading, setLoading]   = useState(true);
+  const queryClient = useQueryClient();
   const [showAll, setShowAll]   = useState(false);
   const [selectedDay, setSelectedDay] = useState<DayCell | null>(null);
 
@@ -105,19 +104,25 @@ export default function LoanHistoryScreen() {
 
   // ─── Fetch ─────────────────────────────────────────────────────────────────
 
-  const fetchData = useCallback(async () => {
-    try {
-      const { data } = await loansApi.getById(loanId);
-      setLoan(data.loan);
-      setPayments(data.payments ?? []);
-    } catch {
-      Alert.alert('Error', 'Failed to load loan history.');
-    } finally {
-      setLoading(false);
-    }
-  }, [loanId]);
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['loan_history', loanId],
+    queryFn: async () => {
+      const res = await loansApi.getById(loanId);
+      return res.data;
+    },
+    staleTime: 30000,
+    refetchOnWindowFocus: true,
+  });
 
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const loan = data?.loan;
+  const payments = data?.payments ?? [];
+  const customerId = typeof loan?.customerId === 'string'
+    ? loan.customerId
+    : loan?.customerId?._id;
+
+  const fetchData = async () => {
+    await refetch();
+  };
 
   // ─── Build day grid ────────────────────────────────────────────────────────
 
@@ -133,7 +138,7 @@ export default function LoanHistoryScreen() {
       const date      = new Date(start);
       date.setDate(start.getDate() + i);
 
-      const payment = payments.find((p) => {
+      const payment = payments.find((p: any) => {
         const pd = new Date(p.paymentDate);
         pd.setHours(0, 0, 0, 0);
         return isSameDay(pd, date);
@@ -165,7 +170,7 @@ export default function LoanHistoryScreen() {
     const diffDays  = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
     const currentDay = Math.min(loan.totalDays, Math.max(1, diffDays + 1));
     const expectedSoFar = loan.dailyAmount * currentDay;
-    const collected     = payments.reduce((s, p) => s + p.paidAmount, 0);
+    const collected     = payments.reduce((s: number, p: any) => s + p.paidAmount, 0);
     const pending       = Math.max(0, expectedSoFar - collected);
     return { expectedSoFar, collected, pending, currentDay };
   }, [loan, payments]);
@@ -210,7 +215,7 @@ export default function LoanHistoryScreen() {
 
   // ─── Loading ───────────────────────────────────────────────────────────────
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.centered}>
@@ -507,6 +512,7 @@ export default function LoanHistoryScreen() {
           <PaymentModal
             bottomSheetRef={paymentSheetRef}
             loanId={loan._id}
+            customerId={customerId}
             customerName={customerName ?? ''}
             dayNumber={stats.currentDay}
             expectedAmount={loan.dailyAmount}

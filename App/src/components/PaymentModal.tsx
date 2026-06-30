@@ -12,9 +12,11 @@ import BottomSheet, { BottomSheetView, BottomSheetBackdrop } from '@gorhom/botto
 import type { BottomSheetBackdropProps } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { paymentsApi } from '../api/payments.api';
 import { formatCurrency } from '../utils/formatCurrency';
 import { useDataStore } from '../store/dataStore';
+import { useSyncStore } from '../store/syncStore';
 import NumberPad from './NumberPad';
 import colors from '../theme/colors';
 
@@ -26,6 +28,7 @@ interface PaymentModalProps {
   /** ref used by parent to open/close via bottomSheetRef.current?.expand() */
   bottomSheetRef: React.RefObject<BottomSheet | null>;
   loanId: string;
+  customerId?: string;
   customerName: string;
   dayNumber: number;
   expectedAmount: number;
@@ -38,12 +41,14 @@ interface PaymentModalProps {
 export default function PaymentModal({
   bottomSheetRef,
   loanId,
+  customerId,
   customerName,
   dayNumber,
   expectedAmount,
   onPaymentSaved,
 }: PaymentModalProps) {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
 
   const [rawAmount, setRawAmount] = useState('');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
@@ -51,6 +56,120 @@ export default function PaymentModal({
 
   // Snap points: closed + open at 85%
   const snapPoints = useMemo(() => ['85%'], []);
+
+  const paymentMutation = useMutation({
+    mutationFn: async ({ amount, mode }: { amount: number; mode: PaymentMode }) => {
+      const todayISO = new Date().toISOString();
+      const payload = {
+        loanId,
+        paidAmount: amount,
+        paymentDate: todayISO,
+        paymentMode: mode,
+      };
+
+      // Check if online
+      const isOnline = useSyncStore.getState().isOnline;
+      if (!isOnline) {
+        // Queue offline
+        const localId = `temp-${Date.now()}`;
+        useSyncStore.getState().addPendingPayment({
+          localId,
+          loanId,
+          amount,
+          paymentDate: todayISO,
+          paymentMethod: mode,
+        });
+        return { isOffline: true, localId, amount, mode };
+      }
+
+      const res = await paymentsApi.create(payload);
+      return res.data;
+    },
+    onMutate: async ({ amount, mode }) => {
+      // Cancel outgoing queries
+      if (customerId) {
+        await queryClient.cancelQueries({ queryKey: ['customer_details', customerId] });
+      }
+      await queryClient.cancelQueries({ queryKey: ['payments', 'today'] });
+      await queryClient.cancelQueries({ queryKey: ['loan_history', loanId] });
+
+      // Snapshot previous data
+      const previousDetails = customerId
+        ? queryClient.getQueryData(['customer_details', customerId])
+        : null;
+      const previousHistory = queryClient.getQueryData(['loan_history', loanId]);
+      const previousToday = queryClient.getQueryData(['payments', 'today']);
+
+      const newPayment = {
+        _id: `temp-${Date.now()}`,
+        loanId,
+        paidAmount: amount,
+        paymentDate: new Date().toISOString(),
+        paymentMode: mode,
+        status: amount >= expectedAmount ? 'paid' : 'underpaid',
+      };
+
+      // Optimistic update for Customer Details
+      if (customerId) {
+        queryClient.setQueryData(['customer_details', customerId], (old: any) => {
+          if (!old) return old;
+          // Append new payment at the beginning of the list
+          const paymentsArray = old.payments ?? [];
+          return {
+            ...old,
+            payments: [newPayment, ...paymentsArray],
+            // Update active loan today payment if present
+            activeLoan: old.activeLoan ? {
+              ...old.activeLoan,
+              todayPayment: {
+                status: amount >= expectedAmount ? 'paid' : 'underpaid',
+                paidAmount: amount,
+              }
+            } : null
+          };
+        });
+      }
+
+      // Optimistic update for Today's Payments totals
+      queryClient.setQueryData(['payments', 'today'], (old: any) => {
+        if (!old) return old;
+        const currentTotals = old.totals ?? { totalCollected: 0, totalCash: 0, totalOnline: 0 };
+        return {
+          ...old,
+          totals: {
+            totalCollected: currentTotals.totalCollected + amount,
+            totalCash: currentTotals.totalCash + (mode === 'cash' ? amount : 0),
+            totalOnline: currentTotals.totalOnline + (mode === 'online' ? amount : 0),
+          }
+        };
+      });
+
+      return { previousDetails, previousHistory, previousToday };
+    },
+    onError: (err, variables, context: any) => {
+      // Rollback
+      if (customerId && context?.previousDetails) {
+        queryClient.setQueryData(['customer_details', customerId], context.previousDetails);
+      }
+      if (context?.previousHistory) {
+        queryClient.setQueryData(['loan_history', loanId], context.previousHistory);
+      }
+      if (context?.previousToday) {
+        queryClient.setQueryData(['payments', 'today'], context.previousToday);
+      }
+      Alert.alert('Error', 'Failed to save payment. Rolled back.');
+    },
+    onSettled: () => {
+      // Invalidate queries to trigger background catch up
+      if (customerId) {
+        queryClient.invalidateQueries({ queryKey: ['customer_details', customerId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['loan_history', loanId] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['groups'] });
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+    },
+  });
 
   // ─── Number pad input handler ──────────────────────────────────────────────
 
@@ -86,13 +205,7 @@ export default function PaymentModal({
 
     setSaving(true);
     try {
-      const todayISO = new Date().toISOString();
-      await paymentsApi.create({
-        loanId,
-        paidAmount: amount,
-        paymentDate: todayISO,
-        paymentMode,
-      });
+      const res = await paymentMutation.mutateAsync({ amount, mode: paymentMode });
 
       // Close sheet, reset state, notify parent
       bottomSheetRef.current?.close();
@@ -100,9 +213,14 @@ export default function PaymentModal({
       setPaymentMode('cash');
       useDataStore.getState().invalidateCache();
       onPaymentSaved();
+
+      if (res && 'isOffline' in res && res.isOffline) {
+        Alert.alert('Saved Offline', 'Payment queued and will sync when internet is back!');
+      } else {
+        Alert.alert(t('common.confirm'), t('payments.saveSuccess'));
+      }
     } catch (err: any) {
-      const msg = err?.response?.data?.error ?? t('payments.saveFailed');
-      Alert.alert('', msg);
+      // Handled by mutation onError
     } finally {
       setSaving(false);
     }
