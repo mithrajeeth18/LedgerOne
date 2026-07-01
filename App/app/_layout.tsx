@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
@@ -10,6 +10,7 @@ import { useUIStore } from '../src/store/uiStore';
 import colors from '../src/theme/colors';
 import NewCustomerToast from '../src/components/NewCustomerToast';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,17 +30,27 @@ export default function RootLayout() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const startNetworkWatch = useSyncStore((s) => s.startNetworkWatch);
   const loadLanguage = useUIStore((s) => s.loadLanguage);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       await loadLanguage();
       await loadStoredSession();
+      setIsReady(true);
       SplashScreen.hideAsync();
     };
     init();
     const unsubscribe = startNetworkWatch();
     return () => { unsubscribe(); };
   }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    if (!isAuthenticated) {
+      // Force user back to login screen on token expiry / logout
+      router.replace('/(auth)/login');
+    }
+  }, [isAuthenticated, isReady]);
 
   return (
     <QueryClientProvider client={queryClient}>

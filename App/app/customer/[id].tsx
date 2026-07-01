@@ -163,8 +163,11 @@ export default function CustomerDetailScreen() {
       dayNumber = Math.min(activeLoan.totalDays, Math.max(1, diffDays + 1));
 
       // Check if any payment was made today
-      const todayStr = today.toISOString().split('T')[0];
-      const todayPayment = payments.find((p) => p.paymentDate.startsWith(todayStr));
+      const localTodayStr = new Date().toLocaleDateString('en-CA');
+      const todayPayment = payments.find((p) => {
+        const pDate = new Date(p.paymentDate);
+        return pDate.toLocaleDateString('en-CA') === localTodayStr;
+      });
       hasPaymentToday = todayPayment !== undefined;
 
       if (todayPayment) {
