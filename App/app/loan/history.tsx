@@ -97,6 +97,8 @@ export default function LoanHistoryScreen() {
   }>();
 
   const queryClient = useQueryClient();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const nestedScrollRef = useRef<ScrollView>(null);
   const [showAll, setShowAll]   = useState(false);
   const [selectedDay, setSelectedDay] = useState<DayCell | null>(null);
 
@@ -177,7 +179,43 @@ export default function LoanHistoryScreen() {
 
   const todayCell = dayGrid.find((d) => d.state === 'today');
 
+  // Set default selected day to current day on mount
+  useEffect(() => {
+    if (dayGrid.length > 0 && stats.currentDay > 0 && !selectedDay) {
+      const currentCell = dayGrid.find(cell => cell.dayNumber === stats.currentDay);
+      if (currentCell) {
+        setSelectedDay(currentCell);
+      }
+    }
+  }, [dayGrid, stats.currentDay]);
+
+  // Center/auto-scroll nested scroll viewport on today in collapsed mode
+  useEffect(() => {
+    if (!showAll && loan && stats.currentDay > 0) {
+      const currentDay = stats.currentDay;
+      const totalDays = loan.totalDays;
+      if (totalDays > 9) {
+        const windowStart = Math.min(totalDays - 8, Math.max(1, currentDay - 4));
+        const targetRowIdx = Math.floor((windowStart - 1) / 3);
+        const scrollOffset = targetRowIdx * 86; // 80px cell height + 6px gap
+
+        setTimeout(() => {
+          nestedScrollRef.current?.scrollTo({ y: scrollOffset, animated: false });
+        }, 150);
+      }
+    }
+  }, [showAll, loan, stats.currentDay]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  const handleSelectDay = (cell: DayCell | null) => {
+    setSelectedDay(cell);
+    if (cell) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  };
 
   const handleCollect = () => {
     if (!todayCell) return;
@@ -237,8 +275,6 @@ export default function LoanHistoryScreen() {
 
   // ─── Render helpers ────────────────────────────────────────────────────────
 
-  const visibleDays = showAll ? dayGrid : dayGrid.slice(0, INITIAL_DAYS_SHOWN);
-
   const renderDayCell = (cell: DayCell) => {
     const isSelected = selectedDay?.dayNumber === cell.dayNumber;
     const { state, dayNumber, payment } = cell;
@@ -261,7 +297,7 @@ export default function LoanHistoryScreen() {
           isFuture    && styles.dayCellFuture,
           isSelected  && styles.dayCellSelected,
         ]}
-        onPress={() => setSelectedDay(isSelected ? null : cell)}
+        onPress={() => handleSelectDay(isSelected ? null : cell)}
         activeOpacity={0.8}
       >
         {/* Day number badge */}
@@ -296,8 +332,8 @@ export default function LoanHistoryScreen() {
 
   // Build rows of 3
   const gridRows: DayCell[][] = [];
-  for (let i = 0; i < visibleDays.length; i += 3) {
-    gridRows.push(visibleDays.slice(i, i + 3));
+  for (let i = 0; i < dayGrid.length; i += 3) {
+    gridRows.push(dayGrid.slice(i, i + 3));
   }
 
   const canMarkMissed = selectedDay &&
@@ -319,7 +355,11 @@ export default function LoanHistoryScreen() {
           <View style={styles.headerBtn} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.scroll}
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* ── Info Strip ── */}
           <View style={styles.infoStrip}>
@@ -344,17 +384,38 @@ export default function LoanHistoryScreen() {
           </View>
 
           {/* ── Calendar Grid ── */}
-          <View style={styles.gridWrapper}>
-            {gridRows.map((row, rowIdx) => (
-              <View key={rowIdx} style={styles.gridRow}>
-                {row.map((cell) => renderDayCell(cell))}
-                {/* Pad incomplete rows */}
-                {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, i) => (
-                  <View key={`pad-${i}`} style={styles.dayCellPad} />
+          {showAll ? (
+            <View style={styles.gridWrapper}>
+              {gridRows.map((row, rowIdx) => (
+                <View key={rowIdx} style={styles.gridRow}>
+                  {row.map((cell) => renderDayCell(cell))}
+                  {/* Pad incomplete rows */}
+                  {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, i) => (
+                    <View key={`pad-${i}`} style={styles.dayCellPad} />
+                  ))}
+                </View>
+              ))}
+            </View>
+          ) : (
+            <ScrollView
+              ref={nestedScrollRef}
+              style={styles.nestedScroll}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled={true}
+            >
+              <View style={styles.gridWrapper}>
+                {gridRows.map((row, rowIdx) => (
+                  <View key={rowIdx} style={styles.gridRow}>
+                    {row.map((cell) => renderDayCell(cell))}
+                    {/* Pad incomplete rows */}
+                    {row.length < 3 && Array.from({ length: 3 - row.length }).map((_, i) => (
+                      <View key={`pad-${i}`} style={styles.dayCellPad} />
+                    ))}
+                  </View>
                 ))}
               </View>
-            ))}
-          </View>
+            </ScrollView>
+          )}
 
           {/* ── Expand / Collapse toggle ── */}
           <TouchableOpacity
@@ -836,6 +897,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '900',
     color: colors.textPrimary,
+  },
+  nestedScroll: {
+    height: 252,
   },
 
   // Collect CTA
