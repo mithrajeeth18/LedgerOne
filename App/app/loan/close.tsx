@@ -8,7 +8,7 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
@@ -21,6 +21,7 @@ import { formatCurrency } from '../../src/utils/formatCurrency';
 export default function CloseLoanScreen() {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const { loanId, customerName, principalAmount, totalPaid } =
     useLocalSearchParams<{
       loanId: string;
@@ -124,7 +125,7 @@ export default function CloseLoanScreen() {
       </ScrollView>
 
       {/* Bottom Action */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: 20 + insets.bottom }]}>
         <TouchableOpacity
           style={[styles.closeBtn, closing && styles.closeBtnDisabled]}
           onPress={handleCloseLoan}

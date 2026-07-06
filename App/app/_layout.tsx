@@ -62,6 +62,10 @@ export default function RootLayout() {
           <Stack.Screen name="group/[id]" />
           <Stack.Screen name="customer/[id]" />
           <Stack.Screen name="loan/[id]" />
+          <Stack.Screen name="loan/create" />
+          <Stack.Screen name="loan/edit" />
+          <Stack.Screen name="loan/close" />
+          <Stack.Screen name="loan/rollover" />
         </Stack>
         <NewCustomerToast />
       </GestureHandlerRootView>

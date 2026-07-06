@@ -16,6 +16,7 @@ import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
 import { useAuthStore } from '../../src/store/authStore';
 import { useTranslation } from 'react-i18next';
+import { usePrefetchOnLogin } from '../../src/hooks/usePrefetchOnLogin';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,9 @@ export default function HomeScreen() {
   const { t } = useTranslation();
   const currentUser = useAuthStore((s) => s.user);
   const [refreshing, setRefreshing] = useState(false);
+
+  // 🚀 Silently warm the React Query cache in the background after login
+  usePrefetchOnLogin();
 
   const { data, isLoading, isError, refetch } = useQuery<TodayPaymentsResponse>({
     queryKey: ['payments', 'today'],

@@ -5,7 +5,7 @@ const Payment = require('../models/Payment');
 const Penalty = require('../models/Penalty');
 const asyncHandler = require('../utils/asyncHandler');
 const { calculateFromPrincipal } = require('../utils/loanCalculator');
-const { loanSchema, rolloverSchema } = require('../validators/loan.validator');
+const { loanSchema, rolloverSchema, editLoanSchema } = require('../validators/loan.validator');
 
 const assignLoanNumber = async (groupId) => {
   const updatedGroup = await Group.findOneAndUpdate(
@@ -142,4 +142,59 @@ const markOverdue = asyncHandler(async (req, res) => {
   res.json(loan);
 });
 
-module.exports = { getLoansForCustomer, getLoan, createLoan, closeLoan, rolloverLoan, markOverdue };
+const editLoan = asyncHandler(async (req, res) => {
+  const parsed = editLoanSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.errors });
+
+  const loan = await Loan.findOne({ _id: req.params.id, status: 'active' });
+  if (!loan) return res.status(404).json({ error: 'Active loan not found' });
+
+  const { mode, totalDays, startDate } = parsed.data;
+  const interestRate = parsed.data.interestRate ?? 12;
+
+  let newDailyAmount;
+  let newPrincipalAmount = loan.principalAmount;
+
+  if (mode === 'daily') {
+    newDailyAmount = parsed.data.dailyAmount;
+    newPrincipalAmount = null;
+  } else {
+    newPrincipalAmount = parsed.data.principalAmount;
+    newDailyAmount = calculateFromPrincipal(newPrincipalAmount, interestRate, totalDays).dailyAmount;
+  }
+
+  // Update the loan's core fields
+  loan.dailyAmount = newDailyAmount;
+  loan.totalDays = totalDays;
+  loan.startDate = startDate;
+  loan.principalAmount = newPrincipalAmount;
+  loan.interestRate = interestRate;
+  await loan.save();
+
+  // Recalculate ALL existing payments against the new dailyAmount
+  const payments = await Payment.find({ loanId: loan._id }).sort({ paymentDate: 1, createdAt: 1 });
+  let cumulativePending = 0;
+
+  for (const payment of payments) {
+    payment.expectedAmount = newDailyAmount;
+    const diff = payment.paidAmount - payment.expectedAmount;
+    if (payment.paidAmount === 0) {
+      payment.status = 'skipped';
+    } else if (diff === 0) {
+      payment.status = 'paid';
+    } else if (diff > 0) {
+      payment.status = 'overpaid';
+      payment.extraAmount = diff;
+    } else {
+      payment.status = 'underpaid';
+      payment.extraAmount = 0;
+    }
+    cumulativePending += payment.expectedAmount - payment.paidAmount;
+    payment.cumulativePending = cumulativePending;
+    await payment.save();
+  }
+
+  res.json({ loan, paymentsRecalculated: payments.length });
+});
+
+module.exports = { getLoansForCustomer, getLoan, createLoan, closeLoan, rolloverLoan, markOverdue, editLoan };

@@ -9,7 +9,7 @@ import {
   ScrollView,
   FlatList,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -91,6 +91,7 @@ const formatDateLong = (d: Date) => {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LoanHistoryScreen() {
+  const insets = useSafeAreaInsets();
   const { loanId, customerName } = useLocalSearchParams<{
     loanId: string;
     customerName: string;
@@ -357,7 +358,7 @@ export default function LoanHistoryScreen() {
 
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={styles.scroll}
+          contentContainerStyle={[styles.scroll, { paddingBottom: 120 + insets.bottom }]}
           showsVerticalScrollIndicator={false}
         >
 
@@ -527,7 +528,7 @@ export default function LoanHistoryScreen() {
         </ScrollView>
 
         {/* ── Summary Bar ── */}
-        <View style={styles.summaryBar}>
+        <View style={[styles.summaryBar, !todayCell && { paddingBottom: 12 + insets.bottom }]}>
           <View style={styles.summaryCol}>
             <Text style={styles.summaryLabel}>EXPECTED{'\n'}SO FAR</Text>
             <Text style={styles.summaryValue}>{formatCurrency(stats.expectedSoFar)}</Text>
@@ -550,6 +551,7 @@ export default function LoanHistoryScreen() {
             style={[
               styles.collectBtn,
               todayCell.payment && styles.collectBtnDone,
+              { height: 64 + insets.bottom, paddingBottom: insets.bottom }
             ]}
             onPress={handleCollect}
             disabled={!!todayCell.payment}

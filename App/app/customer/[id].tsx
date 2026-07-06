@@ -11,7 +11,7 @@ import {
   Modal,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet from '@gorhom/bottom-sheet';
@@ -40,6 +40,7 @@ export default function CustomerDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const [collecting, setCollecting] = useState(false);
 
@@ -201,7 +202,7 @@ export default function CustomerDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 24 + insets.bottom }]}>
           {/* Customer Info Card */}
           <View style={styles.profileSection}>
             <View style={styles.profileTextContainer}>
@@ -401,7 +402,7 @@ export default function CustomerDetailScreen() {
             activeOpacity={1}
             onPress={() => setIsLoanMgmtVisible(false)}
           >
-            <View style={styles.loanMgmtSheet}>
+            <View style={[styles.loanMgmtSheet, { paddingBottom: 36 + insets.bottom }]}>
               {/* Sheet Header */}
               <View style={styles.loanMgmtHeader}>
                 <Text style={styles.loanMgmtTitle}>{t('loans.loanManagement')}</Text>
@@ -410,7 +411,36 @@ export default function CustomerDetailScreen() {
                 </TouchableOpacity>
               </View>
 
-              {/* Option 1: Close Loan */}
+              {/* Option 1: Edit Loan */}
+              <TouchableOpacity
+                style={styles.loanMgmtOption}
+                onPress={() => {
+                  setIsLoanMgmtVisible(false);
+                  const startD = new Date(activeLoan!.startDate);
+                  const dd = String(startD.getDate()).padStart(2, '0');
+                  const mm = String(startD.getMonth() + 1).padStart(2, '0');
+                  const yyyy = startD.getFullYear();
+                  router.push({
+                    pathname: '/loan/edit',
+                    params: {
+                      loanId: activeLoan!._id,
+                      customerName: customer.name,
+                      groupId: typeof customer.groupId === 'string' ? customer.groupId : customer.groupId?._id,
+                      dailyAmount: String(activeLoan!.dailyAmount),
+                      principalAmount: String(activeLoan!.principalAmount ?? ''),
+                      interestRate: String(activeLoan!.interestRate ?? 12),
+                      totalDays: String(activeLoan!.totalDays),
+                      startDate: `${dd}-${mm}-${yyyy}`,
+                      totalPaid: String(totalPaid),
+                    },
+                  });
+                }}
+              >
+                <Ionicons name="create-outline" size={22} color={colors.primary} />
+                <Text style={[styles.loanMgmtOptionText, { color: colors.primary }]}>EDIT LOAN</Text>
+              </TouchableOpacity>
+
+              {/* Option 2: Close Loan */}
               <TouchableOpacity
                 style={styles.loanMgmtOption}
                 onPress={() => {
@@ -430,7 +460,7 @@ export default function CustomerDetailScreen() {
                 <Text style={[styles.loanMgmtOptionText, { color: '#dc2626' }]}>{t('loans.closeLoan')}</Text>
               </TouchableOpacity>
 
-              {/* Option 2: Close & Rollover */}
+              {/* Option 3: Close & Rollover */}
               <TouchableOpacity
                 style={styles.loanMgmtOption}
                 onPress={() => {

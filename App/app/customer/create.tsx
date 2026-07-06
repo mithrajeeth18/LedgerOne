@@ -10,7 +10,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { customersApi } from '../../src/api/customers.api';
@@ -26,6 +26,7 @@ interface GroupItem {
 export default function CreateCustomerScreen() {
   const queryClient = useQueryClient();
   const { groupId: paramGroupId } = useLocalSearchParams<{ groupId?: string }>();
+  const insets = useSafeAreaInsets();
   
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -120,7 +121,7 @@ export default function CreateCustomerScreen() {
         <View style={styles.headerBtnPlaceholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 24 + insets.bottom }]} keyboardShouldPersistTaps="handled">
         {/* Form fields */}
         <View style={styles.form}>
           

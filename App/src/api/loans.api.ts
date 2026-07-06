@@ -26,6 +26,16 @@ export const loansApi = {
     notes: string;
   }>) => apiClient.put(`/loans/${id}`, payload),
 
+  /** Edit an active loan's terms (daily amount, duration, start date). Recalculates all existing payments. */
+  edit: (id: string, payload: {
+    mode: 'daily' | 'principal';
+    dailyAmount?: number;
+    principalAmount?: number;
+    interestRate?: number;
+    totalDays: number;
+    startDate: string; // YYYY-MM-DD
+  }) => apiClient.put(`/loans/${id}/edit`, payload),
+
   /** Close an active loan (marks status = 'closed') */
   close: (id: string) =>
     apiClient.put(`/loans/${id}/close`, {}),

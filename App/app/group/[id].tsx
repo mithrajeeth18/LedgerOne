@@ -12,7 +12,7 @@ import {
   Modal,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { groupsApi, DashboardCustomer } from '../../src/api/groups.api';
@@ -83,6 +83,7 @@ import { useMemo } from 'react';
 
 export default function GroupDetailScreen() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const { id, groupName: paramName, fromHome } = useLocalSearchParams<{
     id: string;
     groupName?: string;
@@ -358,7 +359,7 @@ export default function GroupDetailScreen() {
           keyExtractor={(item) => item._id}
           renderItem={renderCard}
           ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 110 + insets.bottom }]}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -373,7 +374,7 @@ export default function GroupDetailScreen() {
 
       {/* ── FAB ── */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
         onPress={() => router.push(`/customer/create?groupId=${id}`)}
         activeOpacity={0.85}
         accessibilityLabel="Add Customer"
@@ -393,7 +394,7 @@ export default function GroupDetailScreen() {
           activeOpacity={1}
           onPress={() => setFilterSheetVisible(false)}
         />
-        <View style={styles.sheetContainer}>
+        <View style={[styles.sheetContainer, { paddingBottom: 36 + insets.bottom }]}>
           {/* Drag handle */}
           <View style={styles.sheetHandle} />
 

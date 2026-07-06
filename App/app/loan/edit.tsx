@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,40 +20,55 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useDataStore } from '../../src/store/dataStore';
 import CalendarModal from '../../src/components/CalendarModal';
 
-export default function CreateLoanScreen() {
+export default function EditLoanScreen() {
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
-  const { customerId, customerName, groupId } = useLocalSearchParams<{
-    customerId: string;
+
+  const {
+    loanId,
+    customerName,
+    groupId,
+    dailyAmount: origDailyAmount,
+    principalAmount: origPrincipalAmount,
+    interestRate: origInterestRate,
+    totalDays: origTotalDays,
+    startDate: origStartDate,
+    totalPaid: totalPaidStr,
+  } = useLocalSearchParams<{
+    loanId: string;
     customerName: string;
     groupId: string;
+    dailyAmount: string;
+    principalAmount: string;
+    interestRate: string;
+    totalDays: string;
+    startDate: string;
+    totalPaid: string;
   }>();
 
-  const [mode, setMode] = useState<'daily' | 'principal'>('daily');
-  const [dailyAmount, setDailyAmount] = useState('300');
-  const [principalAmount, setPrincipalAmount] = useState('10000');
-  const [interestRate, setInterestRate] = useState('12');
-  const [durationDays, setDurationDays] = useState('50');
-  
-  // Set default date to today (DD-MM-YYYY format)
-  const [startDate, setStartDate] = useState(() => {
-    const today = new Date();
-    const dd = String(today.getDate()).padStart(2, '0');
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const yyyy = today.getFullYear();
-    return `${dd}-${mm}-${yyyy}`;
-  });
+  // Determine original mode: if principalAmount is set and > 0 → principal, else → daily
+  const originalMode: 'daily' | 'principal' =
+    origPrincipalAmount && parseFloat(origPrincipalAmount) > 0 ? 'principal' : 'daily';
 
-  const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<'daily' | 'principal'>(originalMode);
+  const [dailyAmount, setDailyAmount] = useState(origDailyAmount ?? '300');
+  const [principalAmount, setPrincipalAmount] = useState(
+    origPrincipalAmount && parseFloat(origPrincipalAmount) > 0 ? origPrincipalAmount : '10000'
+  );
+  const [interestRate, setInterestRate] = useState(origInterestRate ?? '12');
+  const [durationDays, setDurationDays] = useState(origTotalDays ?? '50');
+  const [startDate, setStartDate] = useState(origStartDate ?? '');
+  const [saving, setSaving] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
-  // Parse numeric values safely
+  // Numeric parses
   const parsedDailyAmount = parseFloat(dailyAmount) || 0;
   const parsedPrincipal = parseFloat(principalAmount) || 0;
   const parsedInterestRate = parseFloat(interestRate) || 0;
   const parsedDuration = parseInt(durationDays, 10) || 0;
+  const totalPaid = parseFloat(totalPaidStr ?? '0') || 0;
 
-  // Compute total and daily installments
+  // Computed totals based on current inputs
   let totalToCollect = 0;
   let computedDailyInstallment = 0;
   let interestAmount = 0;
@@ -62,15 +77,31 @@ export default function CreateLoanScreen() {
     totalToCollect = parsedDailyAmount * parsedDuration;
     computedDailyInstallment = parsedDailyAmount;
   } else {
-    // Principal mode: flat interest calculation
     interestAmount = Math.round((parsedPrincipal * parsedInterestRate) / 100);
     totalToCollect = parsedPrincipal + interestAmount;
     computedDailyInstallment = parsedDuration > 0 ? Math.ceil(totalToCollect / parsedDuration) : 0;
   }
 
-  const handleCreate = async () => {
-    if (!customerId || !groupId) {
-      Alert.alert('Error', 'Missing customer or group parameters.');
+  const remainingAfterEdit = Math.max(0, totalToCollect - totalPaid);
+
+  // Detect if anything changed from original values so we can enable/disable button
+  const hasChanged = useMemo(() => {
+    const origDaily = parseFloat(origDailyAmount ?? '0') || 0;
+    const origPrinc = parseFloat(origPrincipalAmount ?? '0') || 0;
+    const origDays = parseInt(origTotalDays ?? '0', 10) || 0;
+    const origDate = origStartDate ?? '';
+
+    if (mode !== originalMode) return true;
+    if (mode === 'daily' && parsedDailyAmount !== origDaily) return true;
+    if (mode === 'principal' && (parsedPrincipal !== origPrinc || parsedInterestRate !== (parseFloat(origInterestRate ?? '12') || 12))) return true;
+    if (parsedDuration !== origDays) return true;
+    if (startDate !== origDate) return true;
+    return false;
+  }, [mode, dailyAmount, principalAmount, interestRate, durationDays, startDate]);
+
+  const handleEdit = async () => {
+    if (!loanId) {
+      Alert.alert('Error', 'Missing loan ID.');
       return;
     }
 
@@ -78,67 +109,74 @@ export default function CreateLoanScreen() {
       Alert.alert('Validation Error', 'Please enter a valid daily amount.');
       return;
     }
-
     if (mode === 'principal' && parsedPrincipal <= 0) {
       Alert.alert('Validation Error', 'Please enter a valid principal amount.');
       return;
     }
-
     if (parsedDuration <= 0) {
       Alert.alert('Validation Error', 'Please enter a valid duration.');
       return;
     }
 
-    // Validate DD-MM-YYYY date format
     const dateRegex = /^\d{2}-\d{2}-\d{4}$/;
     if (!dateRegex.test(startDate.trim())) {
-      Alert.alert('Validation Error', 'Please enter start date in DD-MM-YYYY format (e.g. 27-06-2026).');
+      Alert.alert('Validation Error', 'Please enter start date in DD-MM-YYYY format.');
       return;
     }
 
-    // Convert DD-MM-YYYY to YYYY-MM-DD for backend
     const [dd, mm, yyyy] = startDate.trim().split('-');
     const apiStartDate = `${yyyy}-${mm}-${dd}`;
 
-    setCreating(true);
-    try {
-      await loansApi.create({
-        customerId,
-        groupId,
-        mode,
-        dailyAmount: mode === 'daily' ? parsedDailyAmount : undefined,
-        principalAmount: mode === 'principal' ? parsedPrincipal : undefined,
-        interestRate: mode === 'principal' ? parsedInterestRate : undefined,
-        totalDays: parsedDuration,
-        startDate: apiStartDate,
-      });
+    Alert.alert(
+      'Confirm Edit',
+      `This will update the loan terms and recalculate all existing payments.\n\nPreviously "paid" days may show as UNDERPAID if the new daily amount is higher.\n\nProceed?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Edit Loan',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              await loansApi.edit(loanId, {
+                mode,
+                dailyAmount: mode === 'daily' ? parsedDailyAmount : undefined,
+                principalAmount: mode === 'principal' ? parsedPrincipal : undefined,
+                interestRate: mode === 'principal' ? parsedInterestRate : undefined,
+                totalDays: parsedDuration,
+                startDate: apiStartDate,
+              });
 
-      // Invalidate cached groups and customers to trigger updates on next fetch
-      queryClient.invalidateQueries({ queryKey: ['customer_details', customerId] });
-      queryClient.invalidateQueries({ queryKey: ['customers', groupId] });
-      queryClient.invalidateQueries({ queryKey: ['groups'] });
-      useDataStore.getState().invalidateCache();
+              // Invalidate all affected caches
+              queryClient.invalidateQueries({ queryKey: ['customer_details'] });
+              queryClient.invalidateQueries({ queryKey: ['customers'] });
+              queryClient.invalidateQueries({ queryKey: ['groups'] });
+              queryClient.invalidateQueries({ queryKey: ['loan_history', loanId] });
+              useDataStore.getState().invalidateCache();
 
-      Alert.alert('Success', 'Loan created successfully!');
-      router.back();
-    } catch (err: any) {
-      const msg = err?.response?.data?.error ?? 'Failed to create loan.';
-      Alert.alert('Error', msg);
-    } finally {
-      setCreating(false);
-    }
+              Alert.alert('Success', 'Loan updated successfully! Existing payments have been recalculated.');
+              router.back();
+            } catch (err: any) {
+              const msg = err?.response?.data?.error ?? 'Failed to update loan.';
+              Alert.alert('Error', msg);
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
-
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* TopAppBar: Go back, NEW LOAN title, Customer subtitle */}
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} accessibilityLabel="Go back">
           <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>NEW LOAN</Text>
+          <Text style={styles.headerTitle}>EDIT LOAN</Text>
           <Text style={styles.headerSubtitle}>
             CUSTOMER: {customerName?.toUpperCase() ?? 'UNKNOWN'}
           </Text>
@@ -146,7 +184,20 @@ export default function CreateLoanScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.scrollContainer, { paddingBottom: 240 + insets.bottom }]} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={[styles.scrollContainer, { paddingBottom: 280 + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Already Paid Banner */}
+        {totalPaid > 0 && (
+          <View style={styles.paidBanner}>
+            <Ionicons name="information-circle-outline" size={18} color="#b45309" />
+            <Text style={styles.paidBannerText}>
+              <Text style={styles.paidBannerBold}>{formatCurrency(totalPaid)}</Text> already collected — existing payments will be recalculated against the new daily amount.
+            </Text>
+          </View>
+        )}
+
         {/* Segmented Mode Selector */}
         <View style={styles.segmentedControl}>
           <TouchableOpacity
@@ -168,10 +219,9 @@ export default function CreateLoanScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Input Form Fields */}
+        {/* Form Fields */}
         <View style={styles.form}>
           {mode === 'daily' ? (
-            /* Mode 1: Daily Amount input */
             <View style={styles.inputGroup}>
               <Text style={styles.label}>DAILY AMOUNT</Text>
               <View style={styles.currencyInputContainer}>
@@ -187,10 +237,9 @@ export default function CreateLoanScreen() {
               </View>
             </View>
           ) : (
-            /* Mode 2: Principal + Interest input grid */
             <View style={styles.row}>
               <View style={[styles.inputGroup, { flex: 2 }]}>
-                <Text style={styles.label}>PRINCIPAL(₹)</Text>
+                <Text style={styles.label}>PRINCIPAL (₹)</Text>
                 <TextInput
                   style={styles.input}
                   keyboardType="numeric"
@@ -214,7 +263,7 @@ export default function CreateLoanScreen() {
             </View>
           )}
 
-          {/* Shared Row: Duration & Start Date */}
+          {/* Duration & Start Date */}
           <View style={styles.row}>
             <View style={[styles.inputGroup, { flex: 1 }]}>
               <Text style={styles.label}>DURATION (DAYS)</Text>
@@ -241,11 +290,11 @@ export default function CreateLoanScreen() {
                   placeholder="DD-MM-YYYY"
                   placeholderTextColor={colors.textMuted}
                 />
-                <Ionicons 
-                  name="calendar-outline" 
-                  size={18} 
-                  color={colors.textPrimary} 
-                  style={styles.calendarIcon} 
+                <Ionicons
+                  name="calendar-outline"
+                  size={18}
+                  color={colors.textPrimary}
+                  style={styles.calendarIcon}
                 />
               </TouchableOpacity>
             </View>
@@ -253,7 +302,7 @@ export default function CreateLoanScreen() {
         </View>
       </ScrollView>
 
-      {/* Calendar Picker Modal */}
+      {/* Calendar Modal */}
       <CalendarModal
         visible={isDatePickerVisible}
         onClose={() => setIsDatePickerVisible(false)}
@@ -261,36 +310,55 @@ export default function CreateLoanScreen() {
         onSelectDate={setStartDate}
       />
 
-      {/* Bottom Summary Preview & Actions */}
+      {/* Bottom Summary + Action */}
       <View style={[styles.bottomFixedContainer, { paddingBottom: (Platform.OS === 'ios' ? 24 : 16) + insets.bottom }]}>
-        {/* Calculation Preview */}
+        {/* Preview Card */}
         <View style={styles.previewCard}>
-          <Text style={styles.previewLabel}>TOTAL TO COLLECT</Text>
-          <Text style={styles.previewTotal}>{formatCurrency(totalToCollect)}</Text>
-          
+          <View style={styles.previewRow}>
+            <View style={styles.previewCol}>
+              <Text style={styles.previewLabel}>NEW TOTAL</Text>
+              <Text style={styles.previewTotal}>{formatCurrency(totalToCollect)}</Text>
+            </View>
+            <View style={styles.previewColDivider} />
+            <View style={styles.previewCol}>
+              <Text style={styles.previewLabel}>ALREADY PAID</Text>
+              <Text style={[styles.previewTotal, { color: colors.statusPaid, fontSize: 20 }]}>
+                {formatCurrency(totalPaid)}
+              </Text>
+            </View>
+            <View style={styles.previewColDivider} />
+            <View style={styles.previewCol}>
+              <Text style={styles.previewLabel}>REMAINING</Text>
+              <Text style={[styles.previewTotal, { color: colors.statusUnderpaid ?? '#dc2626', fontSize: 20 }]}>
+                {formatCurrency(remainingAfterEdit)}
+              </Text>
+            </View>
+          </View>
           {mode === 'principal' && (
             <Text style={styles.previewDetailsText}>
               Principal: {formatCurrency(parsedPrincipal)} • Interest ({parsedInterestRate}%): {formatCurrency(interestAmount)}
             </Text>
           )}
-          
           <Text style={styles.previewInstallmentText}>
-            Daily Installment: <Text style={styles.previewInstallmentValue}>{formatCurrency(computedDailyInstallment)}</Text>
+            Daily Installment:{' '}
+            <Text style={styles.previewInstallmentValue}>{formatCurrency(computedDailyInstallment)}</Text>
           </Text>
         </View>
 
-        {/* Primary Action Trigger */}
+        {/* Edit Button */}
         <TouchableOpacity
-          style={[styles.createBtn, creating && styles.createBtnDisabled]}
-          onPress={handleCreate}
-          disabled={creating}
+          style={[styles.editBtn, (!hasChanged || saving) && styles.editBtnDisabled]}
+          onPress={handleEdit}
+          disabled={!hasChanged || saving}
         >
-          {creating ? (
+          {saving ? (
             <ActivityIndicator color={colors.white} />
           ) : (
-            <View style={styles.createBtnContent}>
-              <Ionicons name="document-text-outline" size={22} color={colors.white} />
-              <Text style={styles.createBtnText}>CREATE LOAN</Text>
+            <View style={styles.editBtnContent}>
+              <Ionicons name="create-outline" size={22} color={colors.white} />
+              <Text style={styles.editBtnText}>
+                {hasChanged ? 'EDIT LOAN' : 'NO CHANGES'}
+              </Text>
             </View>
           )}
         </TouchableOpacity>
@@ -342,9 +410,28 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 240, // generous space for the bottom summary overlay
-    gap: 24,
+    paddingTop: 20,
+    gap: 20,
+  },
+  paidBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#fef3c7',
+    borderWidth: 1.5,
+    borderColor: '#f59e0b',
+    borderRadius: 8,
+    padding: 12,
+  },
+  paidBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: '#92400e',
+    lineHeight: 18,
+  },
+  paidBannerBold: {
+    fontWeight: '800',
+    color: '#78350f',
   },
   segmentedControl: {
     height: 48,
@@ -446,7 +533,6 @@ const styles = StyleSheet.create({
     borderColor: colors.borderHeavy,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 16,
     gap: 12,
     zIndex: 10,
   },
@@ -456,29 +542,44 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     borderRadius: 8,
     padding: 12,
+    gap: 6,
     alignItems: 'center',
   },
+  previewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 0,
+    width: '100%',
+  },
+  previewCol: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  previewColDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: colors.outlineVariant,
+  },
   previewLabel: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
     color: colors.textSecondary,
-    letterSpacing: 1,
+    letterSpacing: 0.8,
   },
   previewTotal: {
-    fontSize: 26,
+    fontSize: 22,
     fontWeight: '800',
     color: colors.primary,
-    marginVertical: 4,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
   previewDetailsText: {
     fontSize: 12,
     color: colors.textSecondary,
     fontWeight: '600',
-    marginBottom: 4,
   },
   previewInstallmentText: {
-    fontSize: 14,
+    fontSize: 13,
     color: colors.textSecondary,
     fontWeight: '500',
   },
@@ -487,27 +588,27 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
   },
-  createBtn: {
+  editBtn: {
     height: 64,
     backgroundColor: colors.primary,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 0, // flat shadow
-    elevation: 4,
+    shadowRadius: 0,
   },
-  createBtnDisabled: {
-    opacity: 0.6,
+  editBtnDisabled: {
+    opacity: 0.45,
   },
-  createBtnContent: {
+  editBtnContent: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  createBtnText: {
+  editBtnText: {
     color: colors.white,
     fontSize: 16,
     fontWeight: '800',
