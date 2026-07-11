@@ -1,11 +1,27 @@
 import apiClient from './client';
 
+export type ActiveLoanSummary = {
+  _id: string;
+  loanNumber: number;
+  dailyAmount: number;
+  startDate: string;
+};
+
+export type TodayPaymentSummary = {
+  _id: string;
+  loanId: string;
+  status: 'paid' | 'underpaid' | 'skipped' | 'overpaid';
+  paidAmount: number;
+};
+
 export type DashboardCustomer = {
   _id: string;
   name: string;
   phone: string;
-  activeLoan: { _id: string; loanNumber: number; dailyAmount: number; startDate: string } | null;
-  todayPayment: { _id: string; status: 'paid' | 'underpaid' | 'skipped' | 'overpaid'; paidAmount: number } | null;
+  activeLoans: ActiveLoanSummary[];     // array — all active loans
+  totalDailyAmount: number;             // sum of all dailyAmounts
+  todayPayments: TodayPaymentSummary[]; // one entry per loan that has a payment today
+  todayTotalPaid: number;               // sum of all paidAmounts today
 };
 
 export type DashboardResponse = {

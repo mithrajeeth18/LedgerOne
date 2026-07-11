@@ -47,8 +47,8 @@ const createLoan = asyncHandler(async (req, res) => {
   if (!customer) return res.status(400).json({ error: 'Customer not found' });
   if (customer.groupId.toString() !== groupId) return res.status(400).json({ error: 'Group does not match customer' });
 
-  const activeLoan = await Loan.exists({ customerId, status: 'active' });
-  if (activeLoan) return res.status(400).json({ error: 'Customer already has an active loan' });
+
+
 
   let principalAmount = null;
   const interestRate = parsed.data.interestRate ?? 12;

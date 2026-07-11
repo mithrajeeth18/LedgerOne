@@ -31,7 +31,7 @@ interface CustomerCard {
   name: string;
   phone: string;
   status: PaymentStatus;
-  loanNumber?: number;
+  loanNumbers: number[];   // all active loan numbers
   paidAmount?: number;
   pendingAmount?: number;
 }
@@ -39,21 +39,32 @@ interface CustomerCard {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function resolveStatus(customer: DashboardCustomer): PaymentStatus {
-  if (!customer.activeLoan) return 'NO_LOAN';
+  if (customer.activeLoans.length === 0) return 'NO_LOAN';
 
-  // Loan exists but hasn't started yet
-  const startDate = new Date(customer.activeLoan.startDate);
-  startDate.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  if (startDate > today) return 'NOT_STARTED';
 
-  const payment = customer.todayPayment;
-  if (!payment) return 'PENDING';
+  // Loans that have started (startDate <= today)
+  const startedLoans = customer.activeLoans.filter(loan => {
+    const startDate = new Date(loan.startDate);
+    startDate.setHours(0, 0, 0, 0);
+    return startDate <= today;
+  });
 
-  if (payment.status === 'paid' || payment.status === 'overpaid') return 'PAID';
-  if (payment.status === 'underpaid') return 'UNDERPAID';
-  return 'PENDING'; // skipped
+  // All loans are future-dated
+  if (startedLoans.length === 0) return 'NOT_STARTED';
+
+  const startedLoanIds = new Set(startedLoans.map(l => l._id));
+  const relevantPayments = customer.todayPayments.filter(p => startedLoanIds.has(p.loanId));
+
+  // Any started loan missing a payment today → PENDING (worst-case wins)
+  const anyUnpaid = startedLoans.some(loan => !relevantPayments.find(p => p.loanId === loan._id));
+  if (anyUnpaid) return 'PENDING';
+
+  // Any underpaid → UNDERPAID
+  if (relevantPayments.some(p => p.status === 'underpaid')) return 'UNDERPAID';
+
+  return 'PAID';
 }
 
 const STATUS_ORDER: Record<PaymentStatus, number> = {
@@ -119,25 +130,19 @@ export default function GroupDetailScreen() {
 
   const allCards = useMemo(() => {
     if (!data?.customers) return [];
-    const cards: CustomerCard[] = data.customers.map((c: any) => {
+    const cards: CustomerCard[] = data.customers.map((c: DashboardCustomer) => {
       const status = resolveStatus(c);
-      let paidAmount = 0;
-      let pendingAmount = 0;
-
-      if (c.activeLoan) {
-        pendingAmount = c.activeLoan.dailyAmount;
-        if (c.todayPayment) {
-          paidAmount = c.todayPayment.paidAmount;
-          pendingAmount = Math.max(0, c.activeLoan.dailyAmount - c.todayPayment.paidAmount);
-        }
-      }
+      // paidAmount = total collected today across all loans
+      // pendingAmount = total still owed today across all loans
+      const paidAmount = c.todayTotalPaid ?? 0;
+      const pendingAmount = Math.max(0, (c.totalDailyAmount ?? 0) - paidAmount);
 
       return {
         _id: c._id,
         name: c.name,
         phone: c.phone,
         status,
-        loanNumber: c.activeLoan?.loanNumber || undefined,
+        loanNumbers: c.activeLoans.map(l => l.loanNumber),
         paidAmount,
         pendingAmount,
       };
@@ -174,7 +179,7 @@ export default function GroupDetailScreen() {
 
   // ─── Counts for filter labels ─────────────────────────────────────────────
 
-  // Active = has a loan AND it has started (i.e. collecting is meaningful today)
+  // Active = has at least one loan that has started
   const activeCards    = allCards.filter(c => c.status !== 'NO_LOAN' && c.status !== 'NOT_STARTED');
   const noLoanCards    = allCards.filter(c => c.status === 'NO_LOAN');
   const paidCount      = allCards.filter(c => c.status === 'PAID').length;
@@ -199,7 +204,7 @@ export default function GroupDetailScreen() {
     if (search.trim()) {
       const q = search.toLowerCase();
       const nameMatch = card.name.toLowerCase().includes(q);
-      const loanMatch = card.loanNumber !== undefined && String(card.loanNumber).includes(search.trim());
+      const loanMatch = card.loanNumbers.some(n => String(n).includes(search.trim()));
       return nameMatch || loanMatch;
     }
 
@@ -222,8 +227,10 @@ export default function GroupDetailScreen() {
         <View style={styles.cardLeft}>
           <View style={styles.nameRow}>
             <Text style={styles.customerName}>{item.name}</Text>
-            {item.loanNumber !== undefined && (
-              <Text style={styles.loanNumberText}>L-{item.loanNumber}</Text>
+            {item.loanNumbers.length > 0 && (
+              <Text style={styles.loanNumberText}>
+                {item.loanNumbers.map(n => `L-${n}`).join(' · ')}
+              </Text>
             )}
           </View>
           <Text style={styles.customerPhone}>{item.phone}</Text>

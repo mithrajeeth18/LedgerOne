@@ -23,15 +23,18 @@ import { useDataStore } from '../../src/store/dataStore';
 import colors from '../../src/theme/colors';
 import { formatCurrency } from '../../src/utils/formatCurrency';
 
-interface ActiveLoan {
-  _id: string;
-  loanNumber: number;
-  principalAmount: number;
-  interestRate: number;
-  totalDays: number;
-  dailyAmount: number;
-  startDate: string;
-  status: string;
+interface LoanWithPayments {
+  loan: {
+    _id: string;
+    loanNumber: number;
+    principalAmount: number | null;
+    interestRate: number;
+    totalDays: number;
+    dailyAmount: number;
+    startDate: string;
+    status: string;
+  };
+  payments: any[];
 }
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -51,6 +54,9 @@ export default function CustomerDetailScreen() {
   // Bottom sheet ref — used to open the payment modal
   const paymentSheetRef = useRef<BottomSheet>(null);
 
+  // Selected loan tab index (0 = first/oldest loan)
+  const [selectedLoanIndex, setSelectedLoanIndex] = useState(0);
+
   // Loan Management sheet visibility
   const [isLoanMgmtVisible, setIsLoanMgmtVisible] = useState(false);
 
@@ -58,24 +64,30 @@ export default function CustomerDetailScreen() {
     queryKey: ['customer_details', id],
     queryFn: async () => {
       const res = await customersApi.getById(id);
-      let paymentsList: any[] = [];
-      if (res.data.activeLoan) {
-        const { data: rawPayments } = await paymentsApi.getForLoan(res.data.activeLoan._id);
-        paymentsList = rawPayments;
-      }
+      // Backend now returns { customer, activeLoans: [{loan, payments}] }
       return {
         customer: res.data.customer,
-        activeLoan: res.data.activeLoan,
-        payments: paymentsList,
+        activeLoans: (res.data.activeLoans ?? []) as LoanWithPayments[],
       };
     },
     staleTime: 30000,
     refetchOnWindowFocus: true,
   });
 
+  // Keep selectedLoanIndex in bounds when loans change
+  useEffect(() => {
+    const count = data?.activeLoans?.length ?? 0;
+    if (count > 0 && selectedLoanIndex >= count) {
+      setSelectedLoanIndex(count - 1);
+    }
+  }, [data?.activeLoans?.length]);
+
   const customer = data?.customer;
-  const activeLoan = data?.activeLoan;
-  const payments = data?.payments ?? [];
+  const activeLoans = data?.activeLoans ?? [];
+  // The currently-selected loan tab drives all collect/history/edit actions
+  const selectedLoanData: LoanWithPayments | null = activeLoans[selectedLoanIndex] ?? null;
+  const activeLoan = selectedLoanData?.loan ?? null;
+  const payments = selectedLoanData?.payments ?? [];
 
   const handleCollect = () => {
     if (!activeLoan) return;
@@ -221,6 +233,62 @@ export default function CustomerDetailScreen() {
             <View style={styles.avatarBox}>
               <Text style={styles.avatarText}>{customer.name[0].toUpperCase()}</Text>
             </View>
+          </View>
+
+          {/* ── Loan Switcher: tabs + always-visible Add Loan ──────────────── */}
+          <View style={styles.loanSwitcherRow}>
+            <View style={styles.loanTabsContainer}>
+              {activeLoans.map((entry, idx) => (
+                <TouchableOpacity
+                  key={entry.loan._id}
+                  style={[
+                    styles.loanTab,
+                    idx === selectedLoanIndex && styles.loanTabActive,
+                  ]}
+                  onPress={() => setSelectedLoanIndex(idx)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.loanTabText,
+                      idx === selectedLoanIndex && styles.loanTabTextActive,
+                    ]}
+                  >
+                    L#{entry.loan.loanNumber}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.loanTabSub,
+                      idx === selectedLoanIndex && styles.loanTabSubActive,
+                    ]}
+                  >
+                    {formatCurrency(entry.loan.dailyAmount)}/day
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* + Add Loan — always visible */}
+            <TouchableOpacity
+              style={styles.addLoanInlineBtn}
+              onPress={() =>
+                router.push({
+                  pathname: '/loan/create',
+                  params: {
+                    customerId: customer._id,
+                    customerName: customer.name,
+                    groupId:
+                      typeof customer.groupId === 'string'
+                        ? customer.groupId
+                        : customer.groupId?._id,
+                  },
+                })
+              }
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add-circle-outline" size={16} color={colors.primary} />
+              <Text style={styles.addLoanInlineBtnText}>Add Loan</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Loan Box */}
@@ -1039,5 +1107,71 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: colors.textPrimary,
     letterSpacing: 0.5,
+  },
+
+  // ── Loan Switcher ─────────────────────────────────────────────────────────
+  loanSwitcherRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 4,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  loanTabsContainer: {
+    flexDirection: 'row',
+    flex: 1,
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  loanTab: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.borderHeavy,
+    backgroundColor: colors.surfaceContainerLowest,
+    alignItems: 'center',
+    minWidth: 72,
+  },
+  loanTabActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(99,102,241,0.08)',
+  },
+  loanTabText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: colors.textSecondary,
+    letterSpacing: 0.4,
+  },
+  loanTabTextActive: {
+    color: colors.primary,
+  },
+  loanTabSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+  loanTabSubActive: {
+    color: colors.primary,
+    opacity: 0.8,
+  },
+  addLoanInlineBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+  },
+  addLoanInlineBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+    letterSpacing: 0.3,
   },
 });

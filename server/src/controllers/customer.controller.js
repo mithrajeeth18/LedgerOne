@@ -1,6 +1,7 @@
 const Customer = require('../models/Customer');
 const Group = require('../models/Group');
 const Loan = require('../models/Loan');
+const Payment = require('../models/Payment');
 const asyncHandler = require('../utils/asyncHandler');
 const { customerSchema, updateCustomerSchema } = require('../validators/customer.validator');
 
@@ -10,18 +11,18 @@ const populateGroup = { path: 'groupId', select: 'name loanCounter' };
 
 const getCustomers = asyncHandler(async (req, res) => {
   const customers = await Customer.find({ isDeleted: false }).populate(populateGroup).sort({ name: 1 }).lean();
-  
-  // Find all active loans
+
   const activeLoans = await Loan.find({ status: 'active' }).lean();
   const loanMap = {};
   for (const loan of activeLoans) {
-    loanMap[loan.customerId.toString()] = loan;
+    const cid = loan.customerId.toString();
+    if (!loanMap[cid]) loanMap[cid] = [];
+    loanMap[cid].push(loan);
   }
 
-  // Enrich each customer with their active loan
   const enriched = customers.map(c => ({
     ...c,
-    activeLoan: loanMap[c._id.toString()] || null
+    activeLoans: loanMap[c._id.toString()] || [],
   }));
 
   res.json(enriched);
@@ -29,17 +30,19 @@ const getCustomers = asyncHandler(async (req, res) => {
 
 const getCustomersByGroup = asyncHandler(async (req, res) => {
   const customers = await Customer.find({ groupId: req.params.groupId, isDeleted: false }).populate(populateGroup).sort({ name: 1 }).lean();
-  
+
   const customerIds = customers.map(c => c._id);
   const activeLoans = await Loan.find({ customerId: { $in: customerIds }, status: 'active' }).lean();
   const loanMap = {};
   for (const loan of activeLoans) {
-    loanMap[loan.customerId.toString()] = loan;
+    const cid = loan.customerId.toString();
+    if (!loanMap[cid]) loanMap[cid] = [];
+    loanMap[cid].push(loan);
   }
 
   const enriched = customers.map(c => ({
     ...c,
-    activeLoan: loanMap[c._id.toString()] || null
+    activeLoans: loanMap[c._id.toString()] || [],
   }));
 
   res.json(enriched);
@@ -52,7 +55,6 @@ const createCustomer = asyncHandler(async (req, res) => {
   const group = await Group.findOne({ _id: parsed.data.groupId, isDeleted: false });
   if (!group) return res.status(400).json({ error: 'Group not found' });
 
-  // Prevent duplicate phone numbers for active customers
   const existingCustomer = await Customer.findOne({
     phone: parsed.data.phone,
     isDeleted: false,
@@ -70,8 +72,18 @@ const getCustomer = asyncHandler(async (req, res) => {
   const customer = await Customer.findOne({ _id: req.params.id, isDeleted: false }).populate(populateGroup);
   if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
-  const activeLoan = await Loan.findOne({ customerId: customer._id, status: 'active' });
-  res.json({ customer, activeLoan });
+  // Fetch ALL active loans for this customer, sorted oldest-first
+  const activeLoans = await Loan.find({ customerId: customer._id, status: 'active' }).sort({ createdAt: 1 });
+
+  // For each loan, fetch its full payment history
+  const loansWithPayments = await Promise.all(
+    activeLoans.map(async (loan) => {
+      const payments = await Payment.find({ loanId: loan._id }).sort({ paymentDate: 1 });
+      return { loan, payments };
+    })
+  );
+
+  res.json({ customer, activeLoans: loansWithPayments });
 });
 
 const updateCustomer = asyncHandler(async (req, res) => {
@@ -97,7 +109,7 @@ const deleteCustomer = asyncHandler(async (req, res) => {
   if (!customer) return res.status(404).json({ error: 'Customer not found' });
 
   const activeLoan = await Loan.exists({ customerId: customer._id, status: 'active' });
-  if (activeLoan) return res.status(400).json({ error: 'Cannot delete customer with active loan. Close the loan first.' });
+  if (activeLoan) return res.status(400).json({ error: 'Cannot delete customer with active loan(s). Close all loans first.' });
 
   customer.isDeleted = true;
   customer.deletedAt = new Date();

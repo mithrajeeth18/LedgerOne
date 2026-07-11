@@ -81,15 +81,13 @@ const restoreGroup = asyncHandler(async (req, res) => {
   res.json(group);
 });
 
-// ─── Dashboard: single aggregation — customers + active loan + today payment ───
+// ─── Dashboard: aggregation — customers + ALL active loans + today payments ───
 const getGroupDashboard = asyncHandler(async (req, res) => {
   const groupId = new mongoose.Types.ObjectId(req.params.id);
 
-  // Validate group exists and belongs to this user's scope
   const group = await Group.findOne({ _id: groupId, isDeleted: false }).lean();
   if (!group) return res.status(404).json({ error: 'Group not found' });
 
-  // Today's date range in local server timezone (matching payment creation)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
   const todayEnd = new Date();
@@ -99,7 +97,7 @@ const getGroupDashboard = asyncHandler(async (req, res) => {
     // Step 1: only customers in this group that are not deleted
     { $match: { groupId, isDeleted: false } },
 
-    // Step 2: join their active loan (at most one per customer)
+    // Step 2: join ALL active loans (no $limit)
     {
       $lookup: {
         from: 'loans',
@@ -111,57 +109,67 @@ const getGroupDashboard = asyncHandler(async (req, res) => {
               status: 'active',
             },
           },
-          { $limit: 1 },
+          { $sort: { createdAt: 1 } },
           { $project: { _id: 1, loanNumber: 1, dailyAmount: 1, startDate: 1 } },
         ],
-        as: 'activeLoanArr',
+        as: 'activeLoans',
       },
     },
 
-    // Step 3: unwind the loan array into a nullable field
+    // Step 3: compute total daily amount across all active loans
     {
       $addFields: {
-        activeLoan: { $arrayElemAt: ['$activeLoanArr', 0] },
+        totalDailyAmount: { $sum: '$activeLoans.dailyAmount' },
+        activeLoanIds: '$activeLoans._id',
       },
     },
 
-    // Step 4: join today's payment for the active loan (if any)
+    // Step 4: join today's payments for ALL active loan IDs
     {
       $lookup: {
         from: 'payments',
-        let: { loanId: '$activeLoan._id' },
+        let: { loanIds: '$activeLoanIds' },
         pipeline: [
           {
             $match: {
               $expr: {
                 $and: [
-                  { $eq: ['$loanId', '$$loanId'] },
+                  { $in: ['$loanId', '$$loanIds'] },
                   { $gte: ['$paymentDate', todayStart] },
                   { $lte: ['$paymentDate', todayEnd] },
                 ],
               },
             },
           },
-          { $limit: 1 },
-          { $project: { _id: 1, status: 1, paidAmount: 1 } },
+          { $project: { _id: 1, loanId: 1, status: 1, paidAmount: 1 } },
         ],
-        as: 'todayPaymentArr',
+        as: 'todayPayments',
       },
     },
 
-    // Step 5: shape final output
+    // Step 5: sum total paid today across all loans
+    {
+      $addFields: {
+        todayTotalPaid: { $sum: '$todayPayments.paidAmount' },
+      },
+    },
+
+    // Step 6: shape final output (drop internal helper fields)
     {
       $project: {
         _id: 1,
         name: 1,
         phone: 1,
-        activeLoan: { $ifNull: ['$activeLoan', null] },
-        todayPayment: { $ifNull: [{ $arrayElemAt: ['$todayPaymentArr', 0] }, null] },
+        activeLoans: 1,
+        totalDailyAmount: 1,
+        todayPayments: 1,
+        todayTotalPaid: 1,
       },
     },
   ]);
 
   res.json({ group: { _id: group._id, name: group.name }, customers });
 });
+
 
 module.exports = { getGroups, createGroup, updateGroup, deleteGroup, getBinGroups, restoreGroup, getGroupDashboard };

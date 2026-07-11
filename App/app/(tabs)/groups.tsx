@@ -75,7 +75,7 @@ export default function GroupsScreen() {
       });
 
       const activeLoanCustomers = groupCustomers.filter(
-        (c: any) => c.activeLoan !== null && c.activeLoan !== undefined
+        (c: any) => c.activeLoans && c.activeLoans.length > 0
       );
 
       const groupPayments = paymentsQuery.data.filter((p: any) => {

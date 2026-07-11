@@ -10,6 +10,7 @@ const loanRoutes = require('./src/routes/loan.routes');
 const paymentRoutes = require('./src/routes/payment.routes');
 const penaltyRoutes = require('./src/routes/penalty.routes');
 const reminderRoutes = require('./src/routes/reminder.routes');
+const bulkRoutes = require('./src/routes/bulk.routes');
 const { errorHandler } = require('./src/middleware/error.middleware');
 
 const app = express();
@@ -32,6 +33,7 @@ app.use('/api/loans', loanRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/penalties', penaltyRoutes);
 app.use('/api/reminders', reminderRoutes);
+app.use('/api/bulk', bulkRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
