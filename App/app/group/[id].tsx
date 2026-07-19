@@ -57,12 +57,17 @@ function resolveStatus(customer: DashboardCustomer): PaymentStatus {
   const startedLoanIds = new Set(startedLoans.map(l => l._id));
   const relevantPayments = customer.todayPayments.filter(p => startedLoanIds.has(p.loanId));
 
-  // Any started loan missing a payment today → PENDING (worst-case wins)
-  const anyUnpaid = startedLoans.some(loan => !relevantPayments.find(p => p.loanId === loan._id));
+  // Any started loan with no payment today, OR with a 'skipped' payment (₹0 collected)
+  // → worst-case PENDING wins
+  const anyUnpaid = startedLoans.some(loan => {
+    const payment = relevantPayments.find(p => p.loanId === loan._id);
+    return !payment || payment.status === 'skipped';
+  });
   if (anyUnpaid) return 'PENDING';
 
   // Any underpaid → UNDERPAID
   if (relevantPayments.some(p => p.status === 'underpaid')) return 'UNDERPAID';
+
 
   return 'PAID';
 }
@@ -223,16 +228,22 @@ export default function GroupDetailScreen() {
         activeOpacity={0.85}
         accessibilityLabel={`Customer ${item.name}, status ${label}`}
       >
-        {/* Left: name + phone */}
+        {/* Left: name + loan pills (wrapping) + phone */}
         <View style={styles.cardLeft}>
-          <View style={styles.nameRow}>
-            <Text style={styles.customerName}>{item.name}</Text>
-            {item.loanNumbers.length > 0 && (
-              <Text style={styles.loanNumberText}>
-                {item.loanNumbers.map(n => `L-${n}`).join(' · ')}
-              </Text>
-            )}
-          </View>
+          {/* Name on its own line — no more overflow into status */}
+          <Text style={styles.customerName}>{item.name}</Text>
+
+          {/* Loan number pills — wrap automatically when there are many */}
+          {item.loanNumbers.length > 0 && (
+            <View style={styles.loanPillsRow}>
+              {item.loanNumbers.map(n => (
+                <View key={n} style={styles.loanPill}>
+                  <Text style={styles.loanPillText}>L-{n}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
           <Text style={styles.customerPhone}>{item.phone}</Text>
         </View>
 
@@ -641,6 +652,27 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
   },
+  loanPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+  },
+  loanPill: {
+    borderWidth: 1.5,
+    borderColor: colors.borderHeavy,
+    borderRadius: 3,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    backgroundColor: colors.surfaceContainer,
+  },
+  loanPillText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+
+  // (kept for any remaining references)
   loanNumberText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     fontSize: 11,

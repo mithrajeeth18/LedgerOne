@@ -37,6 +37,40 @@ interface LoanWithPayments {
   payments: any[];
 }
 
+/**
+ * Returns the index of the first loan that is NOT fully paid today.
+ * Falls back to 0 if all loans are paid.
+ */
+function findDefaultLoanIndex(loansWithPayments: LoanWithPayments[]): number {
+  if (loansWithPayments.length === 0) return 0;
+
+  const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+
+  for (let i = 0; i < loansWithPayments.length; i++) {
+    const { loan, payments } = loansWithPayments[i];
+
+    // Skip loans that haven't started yet
+    const start = new Date(loan.startDate);
+    start.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (start > today) continue;
+
+    // Find today's payment entry for this loan
+    const todayPayment = payments.find((p: any) => {
+      const pd = new Date(p.paymentDate);
+      return pd.toLocaleDateString('en-CA') === todayStr;
+    });
+
+    // No payment today, or payment is skipped/underpaid → this loan needs attention
+    if (!todayPayment || todayPayment.status === 'skipped' || todayPayment.status === 'underpaid') {
+      return i;
+    }
+  }
+
+  return 0; // all loans paid today
+}
+
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 export default function CustomerDetailScreen() {
@@ -56,6 +90,8 @@ export default function CustomerDetailScreen() {
 
   // Selected loan tab index (0 = first/oldest loan)
   const [selectedLoanIndex, setSelectedLoanIndex] = useState(0);
+  // Tracks whether we've done the initial auto-select (don't override manual tab clicks)
+  const hasAutoSelectedRef = useRef(false);
 
   // Loan Management sheet visibility
   const [isLoanMgmtVisible, setIsLoanMgmtVisible] = useState(false);
@@ -73,6 +109,15 @@ export default function CustomerDetailScreen() {
     staleTime: 30000,
     refetchOnWindowFocus: true,
   });
+
+  // On first data load: jump to the first unpaid loan tab
+  useEffect(() => {
+    if (!data?.activeLoans || data.activeLoans.length === 0) return;
+    if (hasAutoSelectedRef.current) return; // already auto-selected once
+    const defaultIdx = findDefaultLoanIndex(data.activeLoans);
+    setSelectedLoanIndex(defaultIdx);
+    hasAutoSelectedRef.current = true;
+  }, [data?.activeLoans]);
 
   // Keep selectedLoanIndex in bounds when loans change
   useEffect(() => {
@@ -172,8 +217,10 @@ export default function CustomerDetailScreen() {
     totalPaid = payments.reduce((sum, p) => sum + p.paidAmount, 0);
 
     if (!loanNotStarted) {
+      // dayNumber is the ACTUAL day count — NOT capped at totalDays.
+      // Overdue loans show e.g. "Day 92 of 50" (passed 42 days)
       const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-      dayNumber = Math.min(activeLoan.totalDays, Math.max(1, diffDays + 1));
+      dayNumber = Math.max(1, diffDays + 1);
 
       // Check if any payment was made today
       const localTodayStr = new Date().toLocaleDateString('en-CA');
@@ -341,9 +388,21 @@ export default function CustomerDetailScreen() {
 
               {/* Row 2: Day counter (left) | 3-dot menu (right) */}
               <View style={styles.dayCounterRow}>
-                <Text style={styles.dayCounter}>
-                  {t('loans.dayCounter', { day: dayNumber, total: activeLoan.totalDays })}
-                </Text>
+                <View>
+                  <Text
+                    style={[
+                      styles.dayCounter,
+                      dayNumber > activeLoan.totalDays && { color: '#dc2626' },
+                    ]}
+                  >
+                    {t('loans.dayCounter', { day: dayNumber, total: activeLoan.totalDays })}
+                  </Text>
+                  {dayNumber > activeLoan.totalDays && (
+                    <Text style={styles.overdueLabel}>
+                      OVERDUE · passed {dayNumber - activeLoan.totalDays} days
+                    </Text>
+                  )}
+                </View>
                 <TouchableOpacity
                   style={styles.threeDotBtn}
                   onPress={() => setIsLoanMgmtVisible(true)}
@@ -845,7 +904,13 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.primary,
     textAlign: 'left',
-    flex: 1,
+  },
+  overdueLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#dc2626',
+    letterSpacing: 0.5,
+    marginTop: 2,
   },
   dayCounterRow: {
     flexDirection: 'row',
